@@ -956,7 +956,7 @@ func receive(message: Dictionary) -> void:
 			if message.type=="swap": qa_gamepad_swap=true
 		"effect":
 			audio.effect("clear",int(message.chain),int(message.count))
-			if is_instance_valid(own_board): own_board.add_effect("CHAIN X%d" % message.chain if message.chain>1 else ("%d COMBO!" % message.count if message.count>3 else "+%d" % (message.count*10)))
+			if is_instance_valid(own_board): own_board.add_effect("CHAIN X%d" % message.chain if message.chain>1 else ("%d COMBO!" % message.count if message.count>3 else "+%d" % (message.count*10)),message.get("positions",[]),int(message.chain),int(message.count))
 		"break":
 			audio.effect("glitchBreak")
 			if is_instance_valid(own_board): own_board.add_effect("GLITCH BREAK!")

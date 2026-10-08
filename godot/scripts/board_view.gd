@@ -36,6 +36,7 @@ var reduce_motion = false
 var tile_textures: Dictionary = {}
 var surfaces: Dictionary = {}
 var effects: Array = []
+var impact_bursts: Array = []
 var clock = 0.0
 const BAYER = [0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5]
 
@@ -75,10 +76,15 @@ func update_board(player: Dictionary, own: Dictionary = {}) -> void:
 	active_ability = str(own.get("activeAbility")) if own.get("activeAbility")!=null else ""
 	if fx.clock>=fx.hit_stop_until and is_instance_valid(painter): painter.queue_redraw();queue_redraw()
 
-func add_effect(text: String) -> void:
+func add_effect(text: String, positions: Array = [], chain: int = 1, count: int = 3) -> void:
 	if not miniature:
 		effects.append({"text": text.replace("×","X"), "age": 0.0})
-		if effects.size()>6: effects=effects.slice(-6)
+		if effects.size()>3: effects=effects.slice(-3)
+		if not positions.is_empty() and not reduce_motion and fx.quality!="minimal" and (count>3 or chain>1):
+			var center=Vector2.ZERO
+			for position in positions: center+=Vector2(int(position)%6+.5,floorf(float(position)/6)+.5-rise)*60
+			impact_bursts.append({"center":center/positions.size(),"age":0.0,"strength":minf(3,maxf(chain,count/4.0)),"color":Color("#00E5A3" if chain>1 else "#FFAE03")})
+			impact_bursts=impact_bursts.slice(-4)
 
 func _process(delta: float) -> void:
 	clock += delta
@@ -86,7 +92,9 @@ func _process(delta: float) -> void:
 	fx.advance(delta)
 	for item in effects:
 		item.age += delta
-	effects = effects.filter(func(item): return item.age < .768)
+	effects = effects.filter(func(item): return item.age < 1.1)
+	for burst in impact_bursts: burst.age+=delta
+	impact_bursts=impact_bursts.filter(func(item): return item.age<.52)
 	if fx.clock>=fx.hit_stop_until and not miniature:
 		painter.queue_redraw();queue_redraw()
 
@@ -146,15 +154,26 @@ func paint_board(view: Control) -> void:
 	var top=12
 	for y in range(grid.size()):
 		if grid[y].any(func(value): return value!=0): top=y;break
-	for item in effects:
-		var frame=int(item.age/.032)
-		var unit=3 if reduce_motion else (2 if frame==0 else (4 if frame==1 and (item.text.begins_with("CHAIN") or item.text=="OVERDRIVE!") else 3))
-		if not reduce_motion and frame>20 and frame%2: continue
-		var point=Vector2(PresentationEffects.snap(180-item.text.length()*6*unit/2.0),PresentationEffects.snap(54-(0 if reduce_motion else mini(4,int(frame/3))*3)))
-		if point.y+7*unit>(top-rise)*60: continue
-		fx.bitmap_text(view,item.text,point+Vector2(3,3),unit,Color.BLACK)
-		var text_color=Color("#00E5A3" if item.text.begins_with("CHAIN") else ("#FFAE03" if item.text.ends_with("COMBO!") else ("#F8F9FA" if item.text.begins_with("+") else "#00E5FF")))
-		fx.bitmap_text(view,item.text,point,unit,text_color)
+	if not reduce_motion and fx.quality!="minimal":
+		for burst in impact_bursts:
+			var progress=burst.age/.52
+			var radius=12+sqrt(progress)*70*burst.strength
+			var tint: Color=burst.color
+			tint.a=(1-progress)*.55
+			for n in range(8): view.draw_arc(burst.center,radius,n*PI/4+.08,n*PI/4+.5,8,tint,1.5,true)
+	for index in range(effects.size()):
+		var item=effects[index]
+		var progress=item.age/1.1
+		var scale_value=1.0 if reduce_motion or fx.quality=="minimal" else 1+.12*exp(-progress*16)*sin(progress*24)
+		var unit=minf(3,320.0/maxf(1,item.text.length()*5.5))
+		var width=minf(336,item.text.length()*5.5*unit+24)
+		var tint=Color("#00E5A3" if item.text.begins_with("CHAIN") else ("#FFAE03" if item.text.ends_with("COMBO!") else "#00E5FF"))
+		tint.a=(1-progress)/.28 if progress>.72 else 1.0
+		view.draw_set_transform(fx.offset()+Vector2(180,18+index*38),0,Vector2.ONE*scale_value)
+		view.draw_rect(Rect2(Vector2(-width/2,-4),Vector2(width,32)),Color(0,0,0,tint.a))
+		view.draw_polyline(PackedVector2Array([Vector2(-width/2,21),Vector2(-width/2+8,29),Vector2(width/2-8,29),Vector2(width/2,21)]),tint,1.5,true)
+		view.draw_string(preload("res://scripts/typography.gd").face(neo.typography.bold),Vector2(-(width-24)/2,unit*7),item.text,HORIZONTAL_ALIGNMENT_LEFT,-1,roundi(unit*9),tint)
+	view.draw_set_transform(fx.offset())
 	if not miniature: fx.paint(view,bounds,cell,active_ability,false,grid,rise)
 	if danger>0 and not miniature: view.draw_line(Vector2(2,2),Vector2(358,2),Color(neo.colors.critical if danger>=1 else neo.colors.danger),2,true)
 	if not lesson_hint.is_empty():

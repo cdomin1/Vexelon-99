@@ -16,7 +16,7 @@ export class BoardAnimations {
     if(key!==this.clearKey){this.clearKey=key;this.clearStarted=now;}
   }
   cursorAt(cursor,_now){return cursor;}
-  badge(text,x,y,color,now){this.badges.push({text:text.replaceAll('×','X'),x:180,y:Math.max(18,Math.min(90,y)),color,start:now});this.badges=this.badges.slice(-6);}
+  badge(text,x,y,color,now){this.badges.push({text:text.replaceAll('×','X'),x:180,y:Math.max(18,Math.min(90,y)),color,start:now});this.badges=this.badges.slice(-3);}
   burst(positions,grid,rise,now,intensity=1){
     if(this.reducedMotion||this.quality==='minimal')return;
     if(this.quality==='reduced')positions=positions.slice(0,4);
@@ -35,6 +35,10 @@ export class BoardAnimations {
       const positions=event.positions||[],x=positions.length?positions.reduce((n,p)=>n+(p%6+.5)*60,0)/positions.length:180;
       const y=positions.length?Math.min(...positions.map(p=>(Math.floor(p/6)-rise)*60))-10:360;
       this.burst(positions,grid,rise,now+50,1+Math.max(0,(event.chain||1)-1)*.16);
+      if(!this.reducedMotion&&this.quality!=='minimal'&&(event.count>3||event.chain>1)){
+        const cy=positions.length?positions.reduce((n,p)=>n+(Math.floor(p/6)+.5-rise)*60,0)/positions.length:360;
+        this.rings.push({x,y:cy,start:now,color:event.chain>1?'#00E5A3':'#FFAE03',strength:Math.min(3,Math.max(event.chain||1,(event.count||3)/4))});this.rings=this.rings.slice(-4);
+      }
       if(event.chain>1){this.badge(`CHAIN X${event.chain}`,x,y,'#00E5A3',now);}
       else if(event.count>3)this.badge(`${event.count} COMBO!`,x,y,'#FFAE03',now);
       else this.badge(`+${event.count*10}`,x,y,'#F8F9FA',now);
@@ -53,13 +57,15 @@ export class BoardAnimations {
   }
   overlay(context,now,grid=[],rise=0){
     this.particles=this.particles.filter(p=>now-p.start<384);
-    if(!this.reducedMotion)for(const p of this.particles){
+    if(!this.reducedMotion&&this.quality!=='minimal')for(const p of this.particles){
       const frame=Math.floor((now-p.start)/32);if(frame<0)continue;
       const t=frame*.032;context.fillStyle=frame<2?'#FFFFFF':p.color;
       if(frame>8&&frame%2)continue;
       const px=snap(p.x+p.vx*t),py=snap(p.y+p.vy*t+180*t*t);
       if([py,py+p.size-1].some(y=>[px,px+p.size-1].some(x=>grid[Math.floor(y/60+rise)]?.[Math.floor(x/60)])))continue;
-      context.strokeStyle=p.color;context.lineWidth=1.5;context.beginPath();context.moveTo(px,py);context.lineTo(px+p.size,py+p.size);context.stroke();
+      const tx=px-p.vx*.045,ty=py-p.vy*.045;
+      if([0,.5,1].some(t=>grid[Math.floor((py+(ty-py)*t)/60+rise)]?.[Math.floor((px+(tx-px)*t)/60)]))continue;
+      context.strokeStyle=p.color;context.lineWidth=1.5;context.beginPath();context.moveTo(px,py);context.lineTo(tx,ty);context.globalAlpha=Math.max(0,1-t/.384);context.stroke();context.globalAlpha=1;
     }
     this.projectiles=this.projectiles.filter(p=>now-p.start<320);
     if(!this.reducedMotion)for(const p of this.projectiles){
@@ -67,16 +73,25 @@ export class BoardAnimations {
       context.fillStyle='#000000';context.fillRect(x,y,27,15);context.fillStyle='#FFB81C';context.fillRect(x+3,y+3,21,3);
       context.fillStyle='#38FFFF';context.fillRect(x-9,y+6,6,3);context.fillRect(x-18,y+6,3,3);
     }
-    this.badges=this.badges.filter(b=>now-b.start<768);
-    for(const b of this.badges){
-      const frame=Math.floor((now-b.start)/32),large=b.text.startsWith('CHAIN')||b.text==='OVERDRIVE!';
-      const unit=this.reducedMotion?3:frame===0?2:frame===1&&large?4:3;
-      const width=b.text.length*6*unit,x=snap(b.x-width/2),y=snap(b.y-(this.reducedMotion?0:Math.min(4,Math.floor(frame/3))*3));
-      if(frame>20&&!this.reducedMotion&&frame%2)continue;
-      const top=grid.findIndex(row=>row.some(Boolean));
-      if(y+7*unit>((top<0?12:top)-rise)*60)continue;
-      vectorText(context,b.text,x+3,y+3,unit,'#000000');vectorText(context,b.text,x,y,unit,b.color);
+    this.rings=this.rings.filter(r=>now-r.start<520);
+    if(!this.reducedMotion&&this.quality!=='minimal')for(const r of this.rings){
+      const t=Math.max(0,(now-r.start)/520),radius=12+Math.sqrt(t)*70*r.strength;
+      context.save();context.strokeStyle=r.color;context.globalAlpha=(1-t)*.55;context.lineWidth=1.5;
+      for(let n=0;n<8;n++){const angle=n*Math.PI/4;context.beginPath();context.arc(r.x,r.y,radius,angle+.08,angle+.5);context.stroke();}
+      context.restore();
     }
+    this.badges=this.badges.filter(b=>now-b.start<1100);
+    this.badges.forEach((b,index)=>{
+      const t=Math.max(0,(now-b.start)/1100),motion=!this.reducedMotion&&this.quality!=='minimal';
+      const scale=motion?1+.12*Math.exp(-t*16)*Math.sin(t*24):1;
+      const unit=Math.min(3,320/Math.max(1,b.text.length*5.5));
+      const width=Math.min(336,b.text.length*5.5*unit+24),y=18+index*38;
+      context.save();context.globalAlpha=t>.72?(1-t)/.28:1;context.translate(180,y);context.scale(scale,scale);
+      context.fillStyle='#000000';context.fillRect(-width/2,-4,width,32);
+      context.strokeStyle=b.color;context.lineWidth=1.5;context.beginPath();context.moveTo(-width/2,21);context.lineTo(-width/2+8,29);context.lineTo(width/2-8,29);context.lineTo(width/2,21);context.stroke();
+      if(this.flashing&&this.quality!=='minimal'){context.shadowColor=b.color;context.shadowBlur=8;}
+      vectorText(context,b.text,-(width-24)/2,0,unit,b.color);context.restore();
+    });
   }
 }
 

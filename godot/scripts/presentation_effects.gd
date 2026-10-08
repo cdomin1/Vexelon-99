@@ -123,7 +123,7 @@ func paint(view: Control, bounds: Rect2, _cell: float, active: String, back_only
 			for n in range(8):
 				var angle=n*TAU/8
 				view.draw_rect(Rect2(Vector2(snap(180+cos(angle)*(15+frame*9)),snap(9+sin(angle)*(9+frame*3))),Vector2(3,3)),spark.color)
-	if not reduced_motion and not back_only:
+	if not reduced_motion and quality!="minimal" and not back_only:
 		for particle in particles:
 			var frame=int((clock-particle.start)/FRAME)
 			if frame>8 and frame%2: continue
@@ -135,8 +135,15 @@ func paint(view: Control, bounds: Rect2, _cell: float, active: String, back_only
 				for px in [point.x,point.x+particle.size-1]:
 					var row=int(floorf(py/60+rise));var col=int(floorf(px/60))
 					if row>=0 and row<grid.size() and col>=0 and col<6 and grid[row][col]!=0: occupied=true
+			var tail: Vector2=point-particle.velocity*.045
+			for fraction in [0.0,.5,1.0]:
+				var sample_point=point.lerp(tail,fraction)
+				var row=int(floorf(sample_point.y/60+rise));var col=int(floorf(sample_point.x/60))
+				if row>=0 and row<grid.size() and col>=0 and col<6 and grid[row][col]!=0: occupied=true
 			if occupied: continue
-			view.draw_line(point,point+Vector2.ONE*particle.size,particle.color,1.5,true)
+			var tint: Color=particle.color
+			tint.a=maxf(0,1-t/.384)
+			view.draw_line(point,tail,tint,1.5,true)
 		if flashing=="full":
 			for flash in flashes:
 				var frame=int((clock-flash.start)/FRAME)

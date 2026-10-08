@@ -8,7 +8,8 @@ export function drawVectorTile(ctx,value,x,y,size,{intensity=1,matching=false,mi
   const color=matching?NEO.colors.neutral:(tone||tile.color);
   ctx.globalAlpha=intensity;ctx.strokeStyle=color;
   const line=Math.max(mini?1:1.2,size/60*(value===3?2.8:2));
-  ctx.lineJoin='miter';ctx.lineCap='butt';
+  ctx.lineJoin='round';ctx.lineCap='round';
+  if(!mini&&glow){ctx.shadowColor=color;ctx.shadowBlur=size*.14;}
   const pad=size*.12,extent=size-pad*2;
   for(const [index,{points}]of tilePaths(value).entries()){
     if(mini&&intensity<.5&&index>0&&tile.geometry!=='chevrons')continue;

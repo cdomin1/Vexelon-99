@@ -76,20 +76,26 @@ export class BoardAnimations {
     this.rings=this.rings.filter(r=>now-r.start<520);
     if(!this.reducedMotion&&this.quality!=='minimal')for(const r of this.rings){
       const t=Math.max(0,(now-r.start)/520),radius=12+Math.sqrt(t)*70*r.strength;
-      context.save();context.strokeStyle=r.color;context.globalAlpha=(1-t)*.55;context.lineWidth=1.5;
+      context.save();context.strokeStyle=r.color;context.globalAlpha=(1-t)*.9;context.lineWidth=2;
+      if(this.flashing&&this.quality!=='reduced'){context.shadowColor=r.color;context.shadowBlur=16;}
       for(let n=0;n<8;n++){const angle=n*Math.PI/4;context.beginPath();context.arc(r.x,r.y,radius,angle+.08,angle+.5);context.stroke();}
+      if(this.flashing&&t<.65){
+        const reach=(20+t*110)*r.strength,fade=(1-t/.65);
+        context.globalAlpha=fade*.8;
+        for(const width of [10,4,1.3]){context.lineWidth=width;context.strokeStyle=width===1.3?'#FFFFFF':r.color;context.beginPath();context.moveTo(r.x-reach,r.y);context.lineTo(r.x+reach,r.y);context.moveTo(r.x,r.y-reach*.65);context.lineTo(r.x,r.y+reach*.65);context.stroke();context.globalAlpha*=.6;}
+      }
       context.restore();
     }
     this.badges=this.badges.filter(b=>now-b.start<1100);
     this.badges.forEach((b,index)=>{
       const t=Math.max(0,(now-b.start)/1100),motion=!this.reducedMotion&&this.quality!=='minimal';
-      const scale=motion?1+.12*Math.exp(-t*16)*Math.sin(t*24):1;
+      const scale=motion?1+.32*Math.exp(-t*10)*Math.sin(t*22):1;
       const unit=Math.min(3,320/Math.max(1,b.text.length*5.5));
       const width=Math.min(336,b.text.length*5.5*unit+24),y=18+index*38;
       context.save();context.globalAlpha=t>.72?(1-t)/.28:1;context.translate(180,y);context.scale(scale,scale);
       context.fillStyle='#000000';context.fillRect(-width/2,-4,width,32);
       context.strokeStyle=b.color;context.lineWidth=1.5;context.beginPath();context.moveTo(-width/2,21);context.lineTo(-width/2+8,29);context.lineTo(width/2-8,29);context.lineTo(width/2,21);context.stroke();
-      if(this.flashing&&this.quality!=='minimal'){context.shadowColor=b.color;context.shadowBlur=8;}
+      if(this.flashing&&this.quality!=='minimal'){context.shadowColor=b.color;context.shadowBlur=18;}
       vectorText(context,b.text,-(width-24)/2,0,unit,b.color);context.restore();
     });
   }

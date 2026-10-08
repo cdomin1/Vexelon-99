@@ -19,3 +19,13 @@ test('crowded boards still announce chains and accessibility suppresses motion',
     a.overlay(ctx,100,grid);assert.deepEqual(labels,['CHAIN X2']);assert.deepEqual(scales,[1]);
   }
 });
+test('cross flares require full flash feedback and preserve ring feedback when reduced',()=>{
+  const strokes=[];
+  for(const flashing of [true,false]){
+    const a=new BoardAnimations({reducedMotion:false});a.flashing=flashing;a.event(clear,grid,0,0);
+    let lines=0,arcs=0;
+    const ctx={save(){},restore(){},translate(){},scale(){},fillRect(){},beginPath(){},moveTo(){},lineTo(){lines++},stroke(){},arc(){arcs++},fillText(){}};
+    a.overlay(ctx,100,grid);assert.equal(arcs,8);strokes.push(lines);
+  }
+  assert.equal(strokes[0]-strokes[1],6);
+});

@@ -159,12 +159,20 @@ func paint_board(view: Control) -> void:
 			var progress=burst.age/.52
 			var radius=12+sqrt(progress)*70*burst.strength
 			var tint: Color=burst.color
-			tint.a=(1-progress)*.55
-			for n in range(8): view.draw_arc(burst.center,radius,n*PI/4+.08,n*PI/4+.5,8,tint,1.5,true)
+			tint.a=(1-progress)*.9
+			for n in range(8): view.draw_arc(burst.center,radius,n*PI/4+.08,n*PI/4+.5,8,tint,2,true)
+			if fx.flashing=="full" and progress<.65:
+				var reach=(20+progress*110)*burst.strength
+				tint.a=(1-progress/.65)*.8
+				for thickness in [10.0,4.0,1.3]:
+					var beam=tint if thickness>1.3 else Color(1,1,1,tint.a)
+					view.draw_line(burst.center-Vector2(reach,0),burst.center+Vector2(reach,0),beam,thickness,true)
+					view.draw_line(burst.center-Vector2(0,reach*.65),burst.center+Vector2(0,reach*.65),beam,thickness,true)
+					tint.a*=.6
 	for index in range(effects.size()):
 		var item=effects[index]
 		var progress=item.age/1.1
-		var scale_value=1.0 if reduce_motion or fx.quality=="minimal" else 1+.12*exp(-progress*16)*sin(progress*24)
+		var scale_value=1.0 if reduce_motion or fx.quality=="minimal" else 1+.32*exp(-progress*10)*sin(progress*22)
 		var unit=minf(3,320.0/maxf(1,item.text.length()*5.5))
 		var width=minf(336,item.text.length()*5.5*unit+24)
 		var tint=Color("#00E5A3" if item.text.begins_with("CHAIN") else ("#FFAE03" if item.text.ends_with("COMBO!") else "#00E5FF"))

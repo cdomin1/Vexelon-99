@@ -11,3 +11,9 @@ Added presentation-only feedback to the existing desktop Web/Godot renderers:
 Verification: 112 JavaScript tests pass, zero failures/skips; targeted vector/retro tests pass. Native real-swap five-tile clear/Counter integration passes after the changes, loading and running the modified native renderers without script errors. Web combo/chain frames were visually reviewed in the in-app browser through a temporary presentation fixture using the actual renderer. That fixture is not a competitive/debug game mode. Native graphical and human motion-quality review remains open; headless integration does not prove rendered appearance.
 
 The previous Phase 1 audit remains historical evidence for its recorded commit; this adds presentation changes only and does not close its remaining acceptance checks.
+
+## Stronger neon pass
+
+After feedback that the first pass still looked flat, strengthened the shared phosphor profile to four halo layers and a brighter white core. Web additionally uses a bounded Canvas shadow bloom. Native uses the same layered stroke profile. Full-flash combo/chain impacts now include three-layer cross flares; Reduced Flash retains rings without the cross flare. Callout entrances have a stronger elastic overshoot and Web text bloom. Original tile silhouettes and gameplay remain unchanged.
+
+The temporary preview at port 3082 now loops the actual renderer instead of displaying a frozen frame. Verification: full suite 112/112 after rendering changes, then the additional flare accessibility regression passes (three impact tests total); native clear/Counter integration passes. Web bloom visually reviewed. Native graphical review remains open.

@@ -56,3 +56,16 @@ test('Glitch Counter rewards originate from an authoritative clear, never a forg
   const state=await a.wait('state',s=>s.self.flux===15);assert.equal(state.self.score,50);
   assert.equal(state.self.charge,15);assert.equal(state.self.incoming[0].amount,2);
 });
+test('quick rematch preserves room setup and resets authoritative match state twice',async t=>{
+  let boards=0;
+  const boardFactory=()=>{const b=new Board(()=>.4);b.grid=b.grid.map((r,y)=>r.map((_,x)=>1+(x+y)%4));if(boards++%3===2)b.danger=1.99;return b;};
+  const {client}=await setup(t,{boardFactory}),a=await client();
+  a.send({type:'create',mode:'battle',bots:1,difficulty:'easy',ruleset:'rush',quick:true});
+  const room=(await a.wait('lobby')).room;let previousId;
+  for(let round=0;round<3;round++){
+    const start=await a.wait('start');assert.notEqual(start.matchId,previousId);previousId=start.matchId;assert.equal(start.bots,1);assert.equal(start.ruleset,'rush');
+    const initial=await a.wait('state',s=>s.matchId===start.matchId);assert.equal(initial.self.score,0);assert.equal(initial.self.flux,0);assert.equal(initial.self.activeAbility,null);assert.equal(initial.self.kos,0);
+    await a.wait('finished');
+    if(round<2){a.send({type:'rematch',quick:true});const lobby=await a.wait('lobby',s=>s.state==='waiting');assert.equal(lobby.room,room);assert.equal(lobby.botCount,1);assert.equal(lobby.difficulty,'easy');}
+  }
+});

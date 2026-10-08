@@ -268,7 +268,7 @@ function clearErrors(){$('entry-error').textContent='';$('lobby-error').textCont
 $('code').oninput=()=>{$('code').value=$('code').value.toUpperCase().replace(/[^A-Z0-9]/g,'');};
 $('start').onclick=()=>send({type:'start'});
 $('apply-bots').onclick=()=>{if(!$('bot-count').reportValidity())return;send({type:'bots',count:Number($('bot-count').value),difficulty:$('bot-difficulty').value});};
-$('rematch').onclick=()=>send({type:'rematch'});
+$('rematch').onclick=()=>send({type:'rematch',quick:true});
 for(const name of ['leave-lobby','leave-match'])$(name).onclick=()=>{if(ws.readyState===1)send({type:'leave'});else location.reload();};
 $('copy-code').onclick=async()=>{try{await navigator.clipboard.writeText(room);$('copy-label').textContent='Copied!';}catch{$('copy-label').textContent='Select and copy the code above';}clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('copy-label').textContent='Click to copy',2000);};
 $('help').onclick=()=>{$('help-dialog').showModal();tutorialGallery??=createTutorialGallery($('help-dialog'),{reducedMotion:{get matches(){return systemMotion()||presentation.reducedMotion;},addEventListener:(...args)=>reducedMotion.addEventListener(...args)},flashing:()=>presentation.flashing});tutorialGallery.refresh();if(playing)send({type:'boost',active:false});};$('close-help').onclick=()=>$('help-dialog').close();

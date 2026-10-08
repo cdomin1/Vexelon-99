@@ -974,7 +974,7 @@ func receive(message: Dictionary) -> void:
 			save_preferences()
 			var body = open_modal("VICTORY!" if message.get("won",false) else "MATCH OVER")
 			body.add_child(label(str(message.winner)+" wins!",28))
-			if message.host==network.player_id: body.add_child(button("REMATCH",func(): network.send_message({"type":"rematch"})))
+			if message.host==network.player_id: body.add_child(button("REMATCH",func(): network.send_message({"type":"rematch","quick":true})))
 			body.add_child(button("TITLE SCREEN",func(): network.send_message({"type":"leave"})))
 			var buttons = body.find_children("*","Button",true,false)
 			if not buttons.is_empty(): buttons[0].grab_focus()

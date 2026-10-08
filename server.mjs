@@ -170,7 +170,7 @@ function onMessage(c,msg){
   if(msg.type==='start'&&room.host===c.id&&room.state==='waiting'){
     startMatch(c,room);return;
   }
-  if(msg.type==='rematch'&&room.host===c.id&&room.state==='finished'){room.state='waiting';notify(room);return;}
+  if(msg.type==='rematch'&&room.host===c.id&&room.state==='finished'){room.state='waiting';notify(room);if(msg.quick===true)startMatch(c,room);return;}
   if(msg.type==='ready'&&room.state==='playing'&&msg.matchId===room.start.id){
     if(readyStart(room.start,c.id,now()))for(const p of room.players.values())send(p,{type:'startScheduled',...startFields(room.start,now())});
     return;

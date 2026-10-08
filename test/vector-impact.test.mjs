@@ -24,7 +24,7 @@ test('cross flares require full flash feedback and preserve ring feedback when r
   for(const flashing of [true,false]){
     const a=new BoardAnimations({reducedMotion:false});a.flashing=flashing;a.event(clear,grid,0,0);
     let lines=0,arcs=0;
-    const ctx={save(){},restore(){},translate(){},scale(){},fillRect(){},beginPath(){},moveTo(){},lineTo(){lines++},stroke(){},arc(){arcs++},fillText(){}};
+    const ctx={save(){},restore(){},translate(){},scale(){},fillRect(){},beginPath(){},moveTo(){},lineTo(){lines++},stroke(){},arc(){arcs++},closePath(){},fillText(){}};
     a.overlay(ctx,100,grid);assert.equal(arcs,8);strokes.push(lines);
   }
   assert.equal(strokes[0]-strokes[1],6);

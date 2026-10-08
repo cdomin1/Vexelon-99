@@ -2,6 +2,7 @@ extends Control
 
 const NeoVector = preload("res://scripts/neo_vector.gd")
 var neo = NeoVector.specification()
+var bloom_material: ShaderMaterial
 
 signal selected
 const PresentationEffects = preload("res://scripts/presentation_effects.gd")
@@ -41,6 +42,9 @@ var clock = 0.0
 const BAYER = [0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5]
 
 func _ready() -> void:
+	bloom_material=ShaderMaterial.new()
+	bloom_material.shader=preload("res://shaders/vector_bloom.gdshader")
+	material=bloom_material
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	viewport=SubViewport.new()
@@ -83,7 +87,7 @@ func add_effect(text: String, positions: Array = [], chain: int = 1, count: int 
 		if not positions.is_empty() and not reduce_motion and fx.quality!="minimal" and (count>3 or chain>1):
 			var center=Vector2.ZERO
 			for position in positions: center+=Vector2(int(position)%6+.5,floorf(float(position)/6)+.5-rise)*60
-			impact_bursts.append({"center":center/positions.size(),"age":0.0,"strength":minf(3,maxf(chain,count/4.0)),"color":Color("#00E5A3" if chain>1 else "#FFAE03")})
+			impact_bursts.append({"center":center/positions.size(),"age":0.0,"strength":minf(3,maxf(chain,count/4.0)),"score":count*10*chain,"color":Color("#FF3B30" if chain>=3 else ("#00E5A3" if chain>1 else "#FFAE03"))})
 			impact_bursts=impact_bursts.slice(-4)
 
 func _process(delta: float) -> void:
@@ -134,7 +138,7 @@ func paint_board(view: Control) -> void:
 			var draw_y=float(y)
 			if not reduce_motion and clock-fall_started<.16:
 				for move in fall_moves:
-					if int(move.x)==x and int(move.to)==y and int(move.value)==value: draw_y=lerpf(move.from,move.to,PresentationEffects.stepped(clock-fall_started,.16))
+					if int(move.x)==x and int(move.to)==y and int(move.value)==value: draw_y=lerpf(move.from,move.to,clampf((clock-fall_started)/.16,0,1))
 			var rect = Rect2(Vector2(roundf(x*cell),roundf((draw_y-rise)*cell)),Vector2(cell,cell))
 			var color = Color(.45,.45,.45) if dead else Color.WHITE
 			var flash_frame=int((clock-clear_started)/.032)
@@ -143,7 +147,7 @@ func paint_board(view: Control) -> void:
 				if flash_frame==3: rect.position.y+=3;rect.size.y-=6
 			paint_vector_tile(view,value,rect,color)
 	if not swap_animation.is_empty() and clock-swap_animation.start<.128 and not reduce_motion:
-		var t=PresentationEffects.stepped(clock-swap_animation.start,.128,5)
+		var t=clampf((clock-swap_animation.start)/.128,0,1)
 		for entry in [[swap_animation.left,float(swap_animation.x)+t],[swap_animation.right,float(swap_animation.x)+1-t]]:
 			draw_tile(view,int(entry[0]),Vector2(roundf(float(entry[1])*60),roundf((float(swap_animation.y)-rise)*60)))
 	for block in blocks:
@@ -162,13 +166,27 @@ func paint_board(view: Control) -> void:
 			tint.a=(1-progress)*.9
 			for n in range(8): view.draw_arc(burst.center,radius,n*PI/4+.08,n*PI/4+.5,8,tint,2,true)
 			if fx.flashing=="full" and progress<.65:
-				var reach=(20+progress*110)*burst.strength
+				var reach=(60+progress*240)*burst.strength
 				tint.a=(1-progress/.65)*.8
-				for thickness in [10.0,4.0,1.3]:
-					var beam=tint if thickness>1.3 else Color(1,1,1,tint.a)
+				for thickness in [18.0,6.0,1.8]:
+					var beam=tint if thickness>1.8 else Color(1,1,1,tint.a)
 					view.draw_line(burst.center-Vector2(reach,0),burst.center+Vector2(reach,0),beam,thickness,true)
 					view.draw_line(burst.center-Vector2(0,reach*.65),burst.center+Vector2(0,reach*.65),beam,thickness,true)
 					tint.a*=.6
+			var shard_count=16 if fx.quality=="full" else 8
+			for n in range(shard_count):
+				var angle=n*TAU/shard_count+progress*.8
+				var travel=(18+progress*100)*(1+float(n%3)*.3)
+				var point: Vector2=burst.center+Vector2(cos(angle),sin(angle))*travel
+				var direction=Vector2(cos(angle+progress*3),sin(angle+progress*3))
+				var side=direction.orthogonal()*3
+				var shard_color: Color=burst.color;shard_color.a=1-progress
+				view.draw_polyline(PackedVector2Array([point+direction*8,point+side,point-direction*5,point-side,point+direction*8]),shard_color,1.5,true)
+			if progress<.9:
+				var score_point: Vector2=burst.center-Vector2(42,progress*36)
+				var score_color=Color(1,1,1,1-progress*.7)
+				view.draw_string(preload("res://scripts/typography.gd").face(700),score_point+Vector2(2,2),"+%d" % burst.score,HORIZONTAL_ALIGNMENT_LEFT,-1,32,Color.BLACK)
+				view.draw_string(preload("res://scripts/typography.gd").face(700),score_point,"+%d" % burst.score,HORIZONTAL_ALIGNMENT_LEFT,-1,32,score_color)
 	for index in range(effects.size()):
 		var item=effects[index]
 		var progress=item.age/1.1
@@ -296,6 +314,13 @@ func block_y(block: Dictionary) -> float:
 	return lerpf(-float(block.height),float(block.y),t*t)
 
 func _draw() -> void:
+	material=null if miniature or fx.quality=="minimal" else bloom_material
+	if bloom_material:
+		bloom_material.set_shader_parameter("bloom_strength",0.0 if miniature or fx.quality=="minimal" else (.45 if fx.quality=="reduced" else .9))
+		var impact=0.0
+		if not reduce_motion and fx.flashing=="full":
+			for burst in impact_bursts: impact=maxf(impact,1-burst.age/.52)
+		bloom_material.set_shader_parameter("impact_strength",impact)
 	if not is_instance_valid(viewport): return
 	var cell=minf(size.x/6.0,size.y/12.0)
 	var rect=Rect2(Vector2(roundf((size.x-cell*6)/2),0),Vector2(roundf(cell*6),roundf(cell*12)))

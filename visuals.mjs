@@ -37,7 +37,7 @@ export class BoardAnimations {
       this.burst(positions,grid,rise,now+50,1+Math.max(0,(event.chain||1)-1)*.16);
       if(!this.reducedMotion&&this.quality!=='minimal'&&(event.count>3||event.chain>1)){
         const cy=positions.length?positions.reduce((n,p)=>n+(Math.floor(p/6)+.5-rise)*60,0)/positions.length:360;
-        this.rings.push({x,y:cy,start:now,color:event.chain>1?'#00E5A3':'#FFAE03',strength:Math.min(3,Math.max(event.chain||1,(event.count||3)/4))});this.rings=this.rings.slice(-4);
+        this.rings.push({x,y:cy,start:now,score:event.count*10*(event.chain||1),color:event.chain>=3?'#FF3B30':event.chain>1?'#00E5A3':'#FFAE03',strength:Math.min(3,Math.max(event.chain||1,(event.count||3)/4))});this.rings=this.rings.slice(-4);
       }
       if(event.chain>1){this.badge(`CHAIN X${event.chain}`,x,y,'#00E5A3',now);}
       else if(event.count>3)this.badge(`${event.count} COMBO!`,x,y,'#FFAE03',now);
@@ -80,10 +80,17 @@ export class BoardAnimations {
       if(this.flashing&&this.quality!=='reduced'){context.shadowColor=r.color;context.shadowBlur=16;}
       for(let n=0;n<8;n++){const angle=n*Math.PI/4;context.beginPath();context.arc(r.x,r.y,radius,angle+.08,angle+.5);context.stroke();}
       if(this.flashing&&t<.65){
-        const reach=(20+t*110)*r.strength,fade=(1-t/.65);
+        const reach=(60+t*240)*r.strength,fade=(1-t/.65);
         context.globalAlpha=fade*.8;
-        for(const width of [10,4,1.3]){context.lineWidth=width;context.strokeStyle=width===1.3?'#FFFFFF':r.color;context.beginPath();context.moveTo(r.x-reach,r.y);context.lineTo(r.x+reach,r.y);context.moveTo(r.x,r.y-reach*.65);context.lineTo(r.x,r.y+reach*.65);context.stroke();context.globalAlpha*=.6;}
+        for(const width of [18,6,1.8]){context.lineWidth=width;context.strokeStyle=width===1.8?'#FFFFFF':r.color;context.beginPath();context.moveTo(r.x-reach,r.y);context.lineTo(r.x+reach,r.y);context.moveTo(r.x,r.y-reach*.65);context.lineTo(r.x,r.y+reach*.65);context.stroke();context.globalAlpha*=.6;}
       }
+      const shards=this.quality==='reduced'?8:16;
+      context.globalAlpha=1-t;context.strokeStyle=r.color;context.lineWidth=1.5;
+      for(let n=0;n<shards;n++){
+        const angle=n*Math.PI*2/shards+t*.8,travel=(18+t*100)*(1+n%3*.3),px=r.x+Math.cos(angle)*travel,py=r.y+Math.sin(angle)*travel,dx=Math.cos(angle+t*3),dy=Math.sin(angle+t*3);
+        context.beginPath();context.moveTo(px+dx*8,py+dy*8);context.lineTo(px-dy*3,py+dx*3);context.lineTo(px-dx*5,py-dy*5);context.lineTo(px+dy*3,py-dx*3);context.closePath();context.stroke();
+      }
+      if(t<.9){context.shadowBlur=12;context.globalAlpha=1-t*.7;vectorText(context,'+'+r.score,r.x-42,r.y-t*36,32/9,'#FFFFFF');}
       context.restore();
     }
     this.badges=this.badges.filter(b=>now-b.start<1100);
@@ -134,11 +141,11 @@ export function drawBoard(context,grid,width,height,{rise=0,matches=[],cursor=nu
   for(let y=0;y<12;y++)for(let x=0;x<6;x++){
     const value=grid[y][x],p=y*6+x;if(!value||grouped.has(p)||(swap&&y===swap.y&&(x===swap.x||x===swap.x+1)))continue;
     const move=falling.get(p);let dy=y;
-    if(move)dy=move.from+(move.to-move.from)*step(now-fall.start,160,6);
+    if(move)dy=move.from+(move.to-move.from)*Math.min(1,Math.max(0,(now-fall.start)/160));
     const order=matches.indexOf(p),flashFrame=Math.floor((now-(animations?.clearStarted??now))/32);
     panel(context,value,x,dy-rise,cell,{mini,intensity:miniIntensity,tone:miniTone,glow:presentation?.quality!=='minimal',flash:order>=0&&flashFrame<4&&flashFrame%2===0&&!motionReduced&&(animations?.flashing??true),compress:order>=0&&flashFrame===3&&!motionReduced,warning:y<3,now,reducedMotion:motionReduced});
   }
-  if(swap){const t=step(now-swap.start,128,5);panel(context,swap.left,swap.x+t,swap.y-rise,cell,{warning:swap.y<3,now});panel(context,swap.right,swap.x+1-t,swap.y-rise,cell,{warning:swap.y<3,now});}
+  if(swap){const t=Math.min(1,Math.max(0,(now-swap.start)/128));panel(context,swap.left,swap.x+t,swap.y-rise,cell,{warning:swap.y<3,now});panel(context,swap.right,swap.x+1-t,swap.y-rise,cell,{warning:swap.y<3,now});}
   for(const block of blocks)slab(context,block,(animations?animations.blockY(block,now):block.y)-rise,cell,mini,now,motionReduced,animations?.breakStarts.get(block.id)??(now-360),animations?.flashing??true);
   context.restore();
   if(animations)animations.overlay(context,now,grid,rise);if(presentation)presentation.draw(context,now,width,height,activeAbility,'front');context.restore();

@@ -13,7 +13,7 @@ async function run(args,onText=()=>{}){
  });
 }
 function browserClient(){
- const socket=new WebSocket(url.replace('http','ws')+'/socket');
+ const socket=new WebSocket(url.replace('http','ws')+'/socket');socket.addEventListener('open',()=>socket.send(JSON.stringify({type:'session',combatVersion:1})),{once:true});
  const queue=[],waiting=[];
  socket.addEventListener('message',({data})=>{const message=JSON.parse(data);const index=waiting.findIndex(item=>item.type===message.type);if(index>=0){const item=waiting.splice(index,1)[0];clearTimeout(item.timer);item.accept(message);}else queue.push(message);});
  return {socket,send:message=>socket.send(JSON.stringify(message)),wait:type=>{const i=queue.findIndex(message=>message.type===type);if(i>=0)return Promise.resolve(queue.splice(i,1)[0]);return new Promise((accept,reject)=>{const item={type,accept,timer:setTimeout(()=>reject(new Error('Web client timed out: '+type)),15000)};waiting.push(item);});}};

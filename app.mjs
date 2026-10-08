@@ -1,3 +1,4 @@
+import {COMBAT} from './combat-config.mjs';
 import {MIX,migrateVolume} from './audio-dsp.mjs';
 import {NEO} from './neo-vector.mjs';
 import {TrainingSession,LESSONS} from './training-session.mjs';
@@ -76,10 +77,10 @@ function receiveMessage(msg){
     if(['pulse','ability','attack','effect'].includes(msg.type))presentation.trigger(msg.ability||msg.type,performance.now(),msg);
     animations.event(msg,state?.players.find(p=>p.id===id)?.grid,state?.self.rise||0);
     if(msg.type==='hello'){
-      incompatibleServer=msg.startProtocol!==1||!msg.fluxConfig?.overdrive;
+      incompatibleServer=msg.startProtocol!==1||!msg.fluxConfig?.overdrive||msg.combatConfig?.version!==COMBAT.version;
       for(const b of document.querySelectorAll('#create,#play-cpu,#join-form button'))b.disabled=incompatibleServer;
-      if(incompatibleServer){$('connection').textContent='Outdated game server';error('Start the current server.mjs, then reload. This server cannot start Phase 1 matches.');ws.close(1000,'Incompatible start protocol');return;}
-      $('connection').textContent='';const previous=resumeToken;id=msg.id;liveId=id;fluxConfig=msg.fluxConfig;resumeToken=msg.resumeToken;send({type:'session',resumable:true,startProtocol:1});if(previous&&room)send({type:'resume',token:previous});
+      if(incompatibleServer){$('connection').textContent='Outdated game server';error('Start the current server.mjs, then reload. This server cannot start Phase 2 matches.');ws.close(1000,'Incompatible start protocol');return;}
+      $('connection').textContent='';const previous=resumeToken;id=msg.id;liveId=id;fluxConfig=msg.fluxConfig;resumeToken=msg.resumeToken;send({type:'session',resumable:true,startProtocol:1,combatVersion:COMBAT.version});if(previous&&room)send({type:'resume',token:previous});
     }
     if(msg.type==='resumed'){id=msg.id;resumeToken=msg.resumeToken;room=msg.room;host=msg.host;}
     if(msg.type==='resumeRejected'){room=null;state=null;playing=false;show('entry');error('Session expired. Join a new room.');}
@@ -144,6 +145,13 @@ function receiveMessage(msg){
       const count=msg.self.incoming.reduce((sum,a)=>sum+a.amount,0);document.querySelector('.incoming').hidden=count===0;updateTargetSummary();$('garbage-count').textContent=count;$('garbage-meter').replaceChildren();for(let i=0;i<12;i++){const block=document.createElement('i');block.className=i<Math.min(count,12)?'filled':'';$('garbage-meter').append(block);}
       const self=msg.players.find(p=>p.id===id);if(self)$('player-name').textContent=self.name.toUpperCase();
       if(!finished&&self&&!self.dead){$('board-overlay').hidden=true;}
+      const queue=$('incoming-queue');queue.replaceChildren();
+      for(const [i,packet] of msg.self.incoming.entries()){
+        const row=document.createElement('div');row.className='queue-packet';row.classList.toggle('urgent',packet.delay<=COMBAT.urgentWindow);
+        const text=document.createElement('span');text.textContent=`${i+1}. ${packet.amount} · ${packet.sourceSeat?'P'+packet.sourceSeat:'—'}${packet.reflected?' ↩':''} · ${Math.max(0,packet.delay).toFixed(1)}s`;
+        const bar=document.createElement('progress');bar.max=COMBAT.incomingDelay;bar.value=Math.max(0,packet.delay);bar.setAttribute('aria-label',`Packet ${i+1} counter window`);row.append(text,bar);queue.append(row);
+      }
+      $('reversal-status').textContent=msg.self.reversalCooldown>0?`REVERSAL ${msg.self.reversalCooldown.toFixed(1)}s`:'';
       $('board-status').textContent=msg.self.danger>=1?'CRITICAL — clear the top!':msg.self.danger>0?'DANGER — clear the top!':count?`GLITCH INCOMING! ${count} · ${Math.max(0,Math.ceil(msg.self.incoming[0].delay))}s`:'';
       renderRivals();
     }
@@ -152,6 +160,8 @@ function receiveMessage(msg){
     if(msg.type==='move'||msg.type==='swap')effects.play(msg.type);
     if(msg.type==='pulse'){effects.play('pulse');log(msg.assist?`${msg.from} rescued ${msg.to}: ${msg.cancelled} blocks cancelled!`:`Pulse cancelled ${msg.cancelled} incoming blocks.`);}
     if(msg.type==='break'){effects.play('glitchBreak');log('GLITCH BREAK! Tiles are breaking free.');}
+    if(msg.type==='reversal'){effects.play('pulse');log(`REVERSAL! ${msg.amount} returned to ${msg.to}.`);}
+    if(msg.type==='cascade'){effects.play('clear',{chain:msg.chain});log(`CASCADE X${msg.chain}`);}
     if(msg.type==='counter'){effects.play('flux');log(`GLITCH COUNTER! ${msg.cancelled} blocked · +${msg.reward} Flux`);}
     if(msg.type==='convert')effects.play('move');
     if(msg.type==='effect'){effects.play('clear',msg);if(msg.chain>1||msg.count>3)log(msg.chain>1?`${msg.chain}× chain! Keep it going.`:`${msg.count}-panel combo!`);}
@@ -176,9 +186,9 @@ function startTraining(mode,lesson=0){
     receiveMessage(msg);
   }});
 }
-function trainingUI(msg){const justCompleted=msg.done&&!trainingStatus?.done;trainingStatus=msg;document.body.dataset.training=msg.mode;document.body.dataset.lesson=msg.lesson;document.body.classList.add('training');$('training-instruction').textContent=`${msg.mode==='tutorial'?`TUTORIAL ${msg.lesson+1} / 7 · `:''}${msg.title} — ${msg.done?'NICE!':msg.instruction}${msg.paused?' — PAUSED':''}`;$('training-controls').hidden=msg.mode!=='tutorial';document.querySelector('#training-controls [data-training=next]').hidden=!msg.done;if(justCompleted&&document.body.dataset.input==='gamepad'&&!$('pause-dialog').open)openPause();}
+function trainingUI(msg){const justCompleted=msg.done&&!trainingStatus?.done;trainingStatus=msg;document.body.dataset.training=msg.mode;document.body.dataset.lesson=msg.lesson;document.body.classList.add('training');$('training-instruction').textContent=`${msg.mode==='tutorial'?`TUTORIAL ${msg.lesson+1} / ${LESSONS.length} · `:''}${msg.title} — ${msg.done?'NICE!':msg.instruction}${msg.paused?' — PAUSED':''}`;$('training-controls').hidden=msg.mode!=='tutorial';document.querySelector('#training-controls [data-training=next]').hidden=!msg.done||msg.lesson===LESSONS.length-1;if(justCompleted&&document.body.dataset.input==='gamepad'&&!$('pause-dialog').open)openPause();}
 function stopTraining(){id=liveId;document.body.classList.remove('training');delete document.body.dataset.training;delete document.body.dataset.lesson;training=null;trainingActive=false;$('training-controls').hidden=true;playing=false;state=null;room=null;show('entry');if(ws?.readyState!==1)connect();}
-function openTraining(mode){$('training-setup').dataset.mode=mode;$('practice-options').hidden=mode!=='practice';$('lesson-options').hidden=mode!=='tutorial';$('training-setup').showModal();$('training-start').focus();}
+function openTraining(mode){$('training-lesson').replaceChildren(...LESSONS.map((l,i)=>{const o=document.createElement('option');o.value=i;o.textContent=`${i+1} ${l[0]}`;return o;}));$('training-setup').dataset.mode=mode;$('practice-options').hidden=mode!=='practice';$('lesson-options').hidden=mode!=='tutorial';$('training-setup').showModal();$('training-start').focus();}
 $('tutorial-start').onclick=()=>openTraining('tutorial');$('practice-start').onclick=()=>openTraining('practice');
 $('training-start').onclick=()=>startTraining($('training-setup').dataset.mode,Number($('training-lesson').value));
 $('training-close').onclick=()=>$('training-setup').close();
@@ -219,7 +229,7 @@ function draw(){
   padControls.tick(performance.now());
   const now=performance.now(),offset=presentation.offset(now,true);
   $('arena').style.transform=`translate(${offset.x}px,${offset.y}px)`;
-  if(state&&now>=presentation.hitStopUntil){const self=state.players.find(p=>p.id===id);if(self)drawBoard(ctx,self.grid,360,720,{rise:state.self.rise,matches:state.self.matches,cursor:state.self.cursor,danger:state.self.danger>0,critical:state.self.danger>=1,blocks:self.blocks,animations,presentation,activeAbility:state.self.activeAbility,lessonHint:trainingActive&&trainingStatus?.mode==='tutorial'&&[0,1,3,4].includes(trainingStatus.lesson)?{x:trainingStatus.lesson===3&&!trainingStatus.actions.includes('combo')?0:2,y:11}:null});}
+  if(state&&now>=presentation.hitStopUntil){const self=state.players.find(p=>p.id===id);if(self)drawBoard(ctx,self.grid,360,720,{rise:state.self.rise,matches:state.self.matches,cursor:state.self.cursor,danger:state.self.danger>0,critical:state.self.danger>=1,blocks:self.blocks,animations,presentation,activeAbility:state.self.activeAbility,lessonHint:trainingActive&&trainingStatus?.mode==='tutorial'&&[0,1,3,4,7,8,9].includes(trainingStatus.lesson)?{x:trainingStatus.lesson===7||(trainingStatus.lesson===3&&!trainingStatus.actions.includes('combo'))?0:2,y:11}:null});}
   if(playing&&!finished&&state&&!state.players.find(p=>p.id===id)?.dead)battleIntro.draw(ctx,now,{reducedMotion:presentation.reducedMotion,onCue:(kind,value)=>{effects.play(kind,{cue:value});if(kind==='go')music.setContext('battle');}});
   battleTargeting.draw(now,{reducedMotion:systemMotion()||presentation.reducedMotion,flashing:presentation.flashing});
   requestAnimationFrame(draw);
@@ -239,7 +249,7 @@ function openSettings(){$('effects-dialog').showModal();send({type:'boost',activ
 $('global-settings').onclick=()=>playing?openPause():openSettings();
 $('settings-entry').onclick=openSettings;$('pause-settings').onclick=openSettings;
 $('close-effects').onclick=()=>$('effects-dialog').close();
-function openPause(){if(trainingActive&&training&&!training.paused)training.handle({type:'trainingControl',action:'pause'});send({type:'boost',active:false});$('practice-tools').hidden=!trainingActive||document.body.dataset.training!=='practice';document.getElementById('pause-next').hidden=!trainingActive||!trainingStatus?.done||trainingStatus.mode!=='tutorial';$('pause-status').textContent=trainingActive?'':`Online simulation continues. Room ${room||''}`;$('pause-dialog').showModal();$('resume').focus();}
+function openPause(){if(trainingActive&&training&&!training.paused)training.handle({type:'trainingControl',action:'pause'});send({type:'boost',active:false});$('practice-tools').hidden=!trainingActive||document.body.dataset.training!=='practice';document.getElementById('pause-next').hidden=!trainingActive||!trainingStatus?.done||trainingStatus.mode!=='tutorial'||trainingStatus.lesson===LESSONS.length-1;$('pause-status').textContent=trainingActive?'':`Online simulation continues. Room ${room||''}`;$('pause-dialog').showModal();$('resume').focus();}
 $('pause').onclick=openPause;$('resume').onclick=()=>$('pause-dialog').close();
 $('pause-dialog').addEventListener('close',()=>{if(trainingActive&&training?.paused)training.handle({type:'trainingControl',action:'pause'});});
 $('pause-next').onclick=()=>{send({type:'trainingControl',action:'next'});$('pause-dialog').close();};

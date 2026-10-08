@@ -66,6 +66,7 @@
       "desktop/assets/icon.png",
       "server.mjs",
       "engine.mjs",
+      "combat-config.mjs",
       "match-rules.mjs",
       "match-start.mjs",
       "records.mjs",

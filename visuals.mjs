@@ -29,6 +29,8 @@ export class BoardAnimations {
     if(grid){const top=grid.findIndex(row=>row.some(Boolean));this.freeTop=top<0?12:top;}
     if(event.type==='ability'){this.badge(event.ability.toUpperCase()+'!',180,330,'#00E5FF',now);this.burst([30,35,36,41],grid,rise,now);}
     if(event.type==='pulse'){this.badge(event.assist?'TEAM RESCUE!':'PULSE!',180,330,'#00E5FF',now);this.burst([0,1,2,3,4,5],grid,0,now);}
+    if(event.type==='reversal')this.badge('REVERSAL!',180,50,'#00E5FF',now);
+    if(event.type==='cascade')this.badge(`CASCADE X${event.chain}`,180,50,'#00E5A3',now);
     if(event.type==='counter')this.badge('GLITCH COUNTER!',180,60,'#00E5FF',now);
     if(event.type==='swap')this.swap={...event,start:now};
     if(event.type==='effect'){
@@ -39,7 +41,7 @@ export class BoardAnimations {
         const cy=positions.length?positions.reduce((n,p)=>n+(Math.floor(p/6)+.5-rise)*60,0)/positions.length:360;
         this.rings.push({x,y:cy,start:now,score:event.count*10*(event.chain||1),color:event.chain>=3?'#FF3B30':event.chain>1?'#00E5A3':'#FFAE03',strength:Math.min(3,Math.max(event.chain||1,(event.count||3)/4))});this.rings=this.rings.slice(-4);
       }
-      if(event.chain>1){this.badge(`CHAIN X${event.chain}`,x,y,'#00E5A3',now);}
+      if(event.chain>1){this.badge(`CHAIN X${event.chain}${event.personality?' · '+event.personality:''}`,x,y,'#00E5A3',now);}
       else if(event.count>3)this.badge(`${event.count} COMBO!`,x,y,'#FFAE03',now);
       else this.badge(`+${event.count*10}`,x,y,'#F8F9FA',now);
     }

@@ -21,7 +21,7 @@ async function setup(t){
  const url=await game.listen(),sockets=[];
  t.after(async()=>{for(const ws of sockets)ws.close();await game.close();});
  async function client(){
-  const ws=new WebSocket(url.replace('http:','ws:')+'/socket');sockets.push(ws);const messages=[];
+  const ws=new WebSocket(url.replace('http:','ws:')+'/socket');ws.addEventListener('open',()=>ws.send(JSON.stringify({type:'session',combatVersion:1})),{once:true});sockets.push(ws);const messages=[];
   ws.addEventListener('message',({data})=>messages.push(JSON.parse(data)));
   async function wait(type,predicate=()=>true){const until=Date.now()+6500;while(Date.now()<until){const i=messages.findIndex(m=>m.type===type&&predicate(m));if(i>=0)return messages.splice(i,1)[0];await new Promise(r=>setTimeout(r,10));}throw Error('Timed out '+type);}
   const hello=await wait('hello');ws.send(JSON.stringify({type:'session',resumable:true,startProtocol:1}));

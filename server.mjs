@@ -1,3 +1,4 @@
+import {COMBAT,reversalTarget} from './combat-config.mjs';
 import {readFileSync,existsSync} from 'node:fs';
 import {normalizeManifest} from './music-library.mjs';
 import {TrainingSession} from './training-session.mjs';
@@ -22,7 +23,7 @@ const rooms=new Map(),clients=new Set(),sessions=new Map();
 // Epoch-shaped monotonic clock: wall-clock adjustments cannot alter a match countdown.
 const epoch=Date.now()-performance.now(), now=()=>epoch+performance.now();
 const root=new URL('./',import.meta.url);
-const publicFiles={'/':'index.html','/app.mjs':'app.mjs','/sound.mjs':'sound.mjs','/music.mjs':'music.mjs','/visuals.mjs':'visuals.mjs','/match-rules.mjs':'match-rules.mjs','/records.mjs':'records.mjs','/flux-config.mjs':'flux-config.mjs','/presentation-effects.mjs':'presentation-effects.mjs','/targeting-vfx.mjs':'targeting-vfx.mjs','/targeting-web.mjs':'targeting-web.mjs','/style.css':'style.css','/fonts/VT323-Regular.ttf':'fonts/VT323-Regular.ttf','/fonts/kode-mono/KodeMono-Variable.ttf':'fonts/kode-mono/KodeMono-Variable.ttf','/favicon.svg':'favicon.svg','/logo.svg':'logo.svg','/demo/gameplay.gif':'demo/gameplay.gif','/demo/gameplay.png':'demo/gameplay.png'};
+const publicFiles={'/combat-config.mjs':'combat-config.mjs','/':'index.html','/app.mjs':'app.mjs','/sound.mjs':'sound.mjs','/music.mjs':'music.mjs','/visuals.mjs':'visuals.mjs','/match-rules.mjs':'match-rules.mjs','/records.mjs':'records.mjs','/flux-config.mjs':'flux-config.mjs','/presentation-effects.mjs':'presentation-effects.mjs','/targeting-vfx.mjs':'targeting-vfx.mjs','/targeting-web.mjs':'targeting-web.mjs','/style.css':'style.css','/fonts/VT323-Regular.ttf':'fonts/VT323-Regular.ttf','/fonts/kode-mono/KodeMono-Variable.ttf':'fonts/kode-mono/KodeMono-Variable.ttf','/favicon.svg':'favicon.svg','/logo.svg':'logo.svg','/demo/gameplay.gif':'demo/gameplay.gif','/demo/gameplay.png':'demo/gameplay.png'};
 // Presentation assets only; room simulation and rules are unchanged.
 publicFiles['/tutorials.mjs']='tutorials.mjs';
 publicFiles['/neo-vector.mjs']='neo-vector.mjs';
@@ -102,6 +103,7 @@ function leave(c){
 function onMessage(c,msg){
   if(!msg||typeof msg!=='object')return;
   if(training&&msg.type==='trainingStart'){
+    if(c.combatVersion!==COMBAT.version)return send(c,{type:'error',message:'Update your client for Phase 2 training.'});
     c.training=new TrainingSession({...msg,id:c.id,emit:message=>send(c,message)});return;
   }
   if(c.training){
@@ -109,8 +111,9 @@ function onMessage(c,msg){
     c.training.handle(msg);return;
   }
   if(msg.type==='clock'&&Number.isFinite(msg.sentAt)){send(c,{type:'clock',sentAt:msg.sentAt,serverNow:now()});return;}
-  if(msg.type==='session'){c.startProtocol=msg.startProtocol===1?1:0;c.resumable=msg.resumable===true;if(c.resumable)sessions.set(c.resumeToken,c);else sessions.delete(c.resumeToken);return;}
+  if(msg.type==='session'){if(msg.combatVersion===COMBAT.version)c.combatVersion=msg.combatVersion;c.startProtocol=msg.startProtocol===1?1:0;c.resumable=msg.resumable===true;if(c.resumable)sessions.set(c.resumeToken,c);else sessions.delete(c.resumeToken);return;}
   if(msg.type==='resume'){
+    if(c.combatVersion!==COMBAT.version)return send(c,{type:'error',message:'Update your client for Phase 2 before joining.'});
     const prior=sessions.get(msg.token);
     if(c.room||!prior||prior===c||!prior.disconnectedAt||Date.now()-prior.disconnectedAt>balance.reconnectSeconds*1000||!prior.room)return send(c,{type:'resumeRejected'});
     const room=prior.room;
@@ -131,6 +134,7 @@ function onMessage(c,msg){
     return;
   }
   if(msg.type==='create'||msg.type==='join'){
+    if(c.combatVersion!==COMBAT.version)return send(c,{type:'error',message:'Update your client for Phase 2 before joining.'});
     let room;
     if(msg.type==='create'){
       if(rooms.size>=100)return send(c,{type:'error',message:'Server is full. Try again later.'});
@@ -200,7 +204,7 @@ server.on('upgrade',(req,socket,head)=>{
   const origin=req.headers.origin;
   if(origin){try{if(new URL(origin).host!==req.headers.host){socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');return;}}catch{socket.destroy();return;}}
   socket.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: '+createHash('sha1').update(key+'258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64')+'\r\n\r\n');
-  const c={id:randomBytes(6).toString('hex'),resumeToken:randomBytes(24).toString('hex'),socket,room:null,buffer:Buffer.alloc(0),fragments:[],fragmentSize:0,rate:0};clients.add(c);send(c,{type:'hello',id:c.id,resumeToken:c.resumeToken,fluxConfig:balance,startProtocol:1});
+  const c={id:randomBytes(6).toString('hex'),resumeToken:randomBytes(24).toString('hex'),socket,room:null,buffer:Buffer.alloc(0),fragments:[],fragmentSize:0,rate:0};clients.add(c);send(c,{type:'hello',id:c.id,resumeToken:c.resumeToken,fluxConfig:balance,combatConfig:COMBAT,startProtocol:1});
   const fail=()=>socket.destroy();
   const consume=chunk=>{
     c.buffer=Buffer.concat([c.buffer,chunk]);if(c.buffer.length>16384)return fail();
@@ -243,7 +247,7 @@ function publicPlayers(room){return [...room.players.values()].map(p=>({id:p.id,
 function stateMessage(p,room,players=publicPlayers(room)){
   const alive=[...room.players.values()].filter(p=>!p.board.dead);
   const abilities=abilityStatus(p,room);
-  return {type:'state',...startFields(room.start,now()),remaining:alive.length,mode:room.mode,ruleset:room.ruleset,team:p.team,teamRemaining:room.mode==='teams'?Object.fromEntries(Object.keys(TEAMS).map(team=>[team,alive.filter(p=>p.team===team).length])):null,elapsed:room.elapsed,countdown:Math.ceil(room.countdown),players,self:{attackTarget:opponents(p,room).find(q=>q.id===p.target)?.id||opponents(p,room).find(q=>q.id===p.lastAttackTarget)?.id||null,cursor:p.board.cursor,rise:p.board.rise,matches:p.board.matches,phase:p.board.phase,falls:p.board.falls,fallSerial:p.board.fallSerial,score:p.board.score,chain:p.board.chain,danger:p.board.danger,incoming:p.board.incoming,kos:p.kos,target:p.target,targetMode:p.mode,charge:p.board.charge,bestChain:p.board.bestChain,flux:p.board.flux,maxFluxHeld:p.board.maxFluxHeld,activeAbility:p.board.activeAbility,abilityRemaining:p.board.abilityRemaining,abilities,pulseAvailable:abilities.pulse}};
+  return {type:'state',...startFields(room.start,now()),remaining:alive.length,mode:room.mode,ruleset:room.ruleset,team:p.team,teamRemaining:room.mode==='teams'?Object.fromEntries(Object.keys(TEAMS).map(team=>[team,alive.filter(p=>p.team===team).length])):null,elapsed:room.elapsed,countdown:Math.ceil(room.countdown),players,self:{attackTarget:opponents(p,room).find(q=>q.id===p.target)?.id||opponents(p,room).find(q=>q.id===p.lastAttackTarget)?.id||null,cursor:p.board.cursor,rise:p.board.rise,matches:p.board.matches,phase:p.board.phase,falls:p.board.falls,fallSerial:p.board.fallSerial,score:p.board.score,chain:p.board.chain,danger:p.board.danger,incoming:p.board.incoming,reversalCooldown:p.board.reversalCooldown,combatVersion:COMBAT.version,kos:p.kos,target:p.target,targetMode:p.mode,charge:p.board.charge,bestChain:p.board.bestChain,flux:p.board.flux,maxFluxHeld:p.board.maxFluxHeld,activeAbility:p.board.activeAbility,abilityRemaining:p.board.abilityRemaining,abilities,pulseAvailable:abilities.pulse}};
 }
 function finishMessage(p,room,outcome){
   return {type:'finished',winner:outcome.winner,winnerId:outcome.winnerIds[0],winnerIds:outcome.winnerIds,winnerTeam:outcome.winnerTeam,won:outcome.winnerIds.includes(p.id),place:outcome.winnerIds.includes(p.id)?1:p.place||outcome.alive.length+1,host:room.host};
@@ -264,9 +268,16 @@ const interval=setInterval(()=>{
       p.board.tick(.05,(.055+room.elapsed*.0008)*RULESETS[room.ruleset].speed,p.boost);
       if(!wasDead&&p.board.dead){p.place=[...room.players.values()].filter(q=>!q.board.dead).length+1;const killer=room.players.get(p.lastAttacker);if(killer&&killer!==p)killer.kos++;send(p,{type:'eliminated',place:p.place});}
       for(const event of p.board.events.splice(0)){
+        if(event.type==='reversalIntent'){
+          const source=reversalTarget(p,room,event.sourceId);
+          if(source){source.board.receive(event.amount,COMBAT.incomingDelay,{sourceId:p.id,sourceSeat:p.number,reflected:true});source.lastAttacker=p.id;
+            const attackSequence=++room.attackSerial,confirmed={matchId:room.matchId,eventId:`${room.matchId}:${attackSequence}`,attackSequence,sourceId:p.id,targetId:source.id,from:p.name,to:source.name,amount:event.amount,reflected:true,personality:'reversal'};
+            send(p,{type:'reversal',...confirmed});send(p,{type:'sent',...confirmed});send(source,{type:'attack',...confirmed});}
+          continue;
+        }
         send(p,{...event,type:event.type==='clear'?'effect':event.type});
-        if(event.attack){const target=targetFor(p,room);if(target){const amount=Math.min(Math.round(24*(p.board.modifiers.attack||1)),Math.max(3,event.attack+Math.round(Math.floor(p.kos/2)*(p.board.modifiers.attack||1))));target.board.receive(amount);target.lastAttacker=p.id;p.lastAttackTarget=target.id;
-          const attackSequence=++room.attackSerial,confirmed={matchId:room.matchId,eventId:`${room.matchId}:${attackSequence}`,attackSequence,sourceId:p.id,targetId:target.id,from:p.name,to:target.name,amount};
+        if(event.attack){const target=targetFor(p,room);if(target){const amount=Math.min(Math.round(24*(p.board.modifiers.attack||1)),Math.max(3,event.attack+Math.round(Math.floor(p.kos/2)*(p.board.modifiers.attack||1))));target.board.receive(amount,COMBAT.incomingDelay,{sourceId:p.id,sourceSeat:p.number});target.lastAttacker=p.id;p.lastAttackTarget=target.id;
+          const attackSequence=++room.attackSerial,confirmed={matchId:room.matchId,eventId:`${room.matchId}:${attackSequence}`,attackSequence,sourceId:p.id,targetId:target.id,from:p.name,to:target.name,amount,personality:event.personality||'normal'};
           send(target,{type:'attack',...confirmed});send(p,{type:'sent',...confirmed});}}
       }
     }

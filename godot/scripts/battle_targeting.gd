@@ -29,7 +29,7 @@ func confirm(message: Dictionary, now: float = Time.get_ticks_msec()) -> bool:
 	var channel="outgoing" if message.type=="sent" and source==local_id else ("incoming" if message.type=="attack" and target==local_id else "")
 	if channel.is_empty(): return false
 	last_sequence=sequence
-	events.append({"sourceId":source,"targetId":target,"amount":amount,"channel":channel,"start":now,"eventId":message.eventId})
+	events.append({"sourceId":source,"targetId":target,"amount":amount,"channel":channel,"personality":message.get("personality","normal"),"reflected":message.get("reflected",false),"start":now,"eventId":message.eventId})
 	if events.size()>int(config.maxActive): events=events.slice(-int(config.maxActive))
 	var other=target if channel=="outgoing" else source
 	if rivals.has(other):
@@ -38,13 +38,13 @@ func confirm(message: Dictionary, now: float = Time.get_ticks_msec()) -> bool:
 	return true
 func pixels(event: Dictionary, now: float, from: Vector2, to: Vector2) -> Dictionary:
 	var age=now-event.start
-	var color=str(config.colors[event.channel])
+	var color=str(config.colors["reversal" if event.get("reflected",false) else event.channel])
 	if age<0 or age>=float(config.durationMs)+float(config.impactMs): return {"rects":[],"impact":false,"color":color}
 	var strength=clampi(int(ceil(event.amount/6.0)),1,4)
 	var pixel=int(config.pixel);var extent=pixel*(2 if strength>=3 else 1)
 	var progress=minf(1,floorf(age/float(config.stepMs))*float(config.stepMs)/float(config.durationMs))
 	var rects: Array = []
-	var count=9 if reduced_motion else 3+strength
+	var count=9 if reduced_motion else (12 if event.get("personality")=="burst" else (8 if event.get("personality")=="segmented" else (6 if event.get("personality")=="rapid" else 3+strength)))
 	for n in range(count):
 		var t=n/float(count-1) if reduced_motion else progress-n*.045
 		if t<0 or t>1 or (not reduced_motion and age>=float(config.durationMs)): continue

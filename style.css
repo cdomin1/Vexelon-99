@@ -60,3 +60,9 @@ button,label,select,summary{font-weight:var(--ui-medium)}h1,h2,strong,.board-ove
 #flux-meter{height:14px;border-radius:7px 0;overflow:hidden;box-shadow:0 0 12px #00e5ff18}
 .board-overlay strong{color:#e5fcff;text-shadow:0 0 20px #00e5ff60}
 #board-status:not(:empty){border-bottom:1px solid currentColor;padding-bottom:3px;font-weight:700}
+
+/* Phase 2: contextual FIFO packets; timers pause with board resolution. */
+#incoming-queue{max-height:150px;overflow:auto;font-size:11px}.queue-packet{margin:5px 0;color:var(--muted)}.queue-packet.urgent{color:#FF3B30}.queue-packet progress{display:block;width:100%;height:3px;accent-color:currentColor}#reversal-status{font-size:11px;color:#00E5FF}
+.training[data-training="tutorial"][data-lesson="8"] .rivals-panel{display:flex}
+
+.training[data-training="tutorial"][data-lesson="8"] .rivals-panel{display:flex}.training[data-training="tutorial"][data-lesson="8"] .arena-layout{grid-template-columns:1fr 1fr 180px}

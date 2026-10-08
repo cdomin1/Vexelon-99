@@ -1,3 +1,4 @@
+import {COMBAT,reversalTarget} from './combat-config.mjs';
 import {Board} from './engine.mjs';
 import {abilityStatus,useAbility} from './abilities.mjs';
 import {FLUX} from './flux-config.mjs';
@@ -8,7 +9,10 @@ export const LESSONS=[
  ['COMBOS & CHAINS','Bigger clears send stronger attacks! Make the marked swap.'],
  ['GLITCH BLOCKS','Match next to Glitch Blocks to break them.'],
  ['FLUX','Make matches to fill Flux. Try Pulse, Shift, Surge and Overdrive!'],
- ['BATTLE BASICS','Target the training rival. Send an attack, then block one with Pulse.']
+ ['BATTLE BASICS','Target the training rival. Send an attack, then block one with Pulse.'],
+ ['PHASE 2 · COUNTER WINDOW','Two 4-tile clears counter one packet. Swap the bottom pair at columns 1–2. Watch FIFO amounts; clears pause the timer.'],
+ ['PHASE 2 · REVERSAL','Swap bottom columns 3–4 to start a falling x2 chain. Fully counter the urgent packet: return 3 cells. Reflected packets cannot reflect again.'],
+ ['PHASE 2 · CASCADE','Swap bottom columns 3–4. Falling tiles build x3: CASCADE! Chain tiers change effects, not the attack budget.']
 ];
 export const PRACTICE_DEFAULTS={rise:'off',glitch:'off',flux:'normal',gameOver:false};
 const seedBoard=()=>{
@@ -16,37 +20,47 @@ const seedBoard=()=>{
  b.grid=Array.from({length:12},()=>Array(6).fill(0));b.grid[7]=[3,4,2,3,2,2];b.grid[8]=[4,3,3,1,2,4];b.grid[9]=[3,2,4,2,1,3];b.grid[10]=[2,0,2,4,3,3];b.grid[11]=[1,1,2,1,3,4];b.cursor={x:2,y:11};return b;
 };
 const comboBoard=()=>{const b=seedBoard();b.grid=b.grid.map(r=>r.map(()=>0));for(let y=8;y<11;y++)b.grid[y][0]=1;b.grid[11]=[2,1,3,4,2,3];b.cursor={x:0,y:11};return b;};
+export function cascadeBoard(){
+ const b=seedBoard();b.grid=b.grid.map(r=>r.map(()=>0));b.grid[11]=[1,1,2,1,0,0];b.grid[10][0]=2;b.grid[10][1]=2;b.grid[9][0]=3;b.grid[9][1]=3;for(const y of [6,8,9])b.grid[y][2]=2;b.grid[5][2]=3;return b;
+}
 export class TrainingSession {
  constructor({mode='practice',lesson=0,options={},id='training-player',emit=()=>{}}={}){
-  this.mode=mode==='tutorial'?'tutorial':'practice';this.lesson=Math.max(0,Math.min(6,Math.trunc(lesson)||0));this.options={...PRACTICE_DEFAULTS};
+  this.mode=mode==='tutorial'?'tutorial':'practice';this.lesson=Math.max(0,Math.min(LESSONS.length-1,Math.trunc(lesson)||0));this.options={...PRACTICE_DEFAULTS};
   for(const [key,allowed]of Object.entries({rise:['off','slow','normal','fast'],glitch:['off','training'],flux:['normal','unlimited']}))if(allowed.includes(options[key]))this.options[key]=options[key];
   if(typeof options.gameOver==='boolean')this.options.gameOver=options.gameOver;
   this.id=id;this.emit=emit;this.serial=0;this.elapsed=0;this.paused=false;this.done=false;this.actions=new Set();this.requests=new Set();this.target=null;this.restart();
  }
  restart(){
-  this.player={id:this.id,name:'YOU',board:seedBoard()};this.opponent={id:'training-rival',name:'TRAINING RIVAL',board:seedBoard()};this.room={mode:'duel',players:new Map([[this.id,this.player],[this.opponent.id,this.opponent]])};
-  this.done=false;this.paused=false;this.actions.clear();this.requests.clear();this.elapsed=0;this.recoveries=0;this.serial=0;this.matchId=`training-${++TrainingSession.nextId}`;
+  this.player={id:this.id,name:'YOU',board:seedBoard()};this.opponent={id:'training-rival',name:'TRAINING RIVAL',training:true,board:seedBoard()};this.room={mode:'duel',players:new Map([[this.id,this.player],[this.opponent.id,this.opponent]])};
+  this.scenario=null;this.done=false;this.paused=false;this.actions.clear();this.requests.clear();this.elapsed=0;this.recoveries=0;this.serial=0;this.matchId=`training-${++TrainingSession.nextId}`;
   const b=this.player.board;
   if(this.mode==='tutorial'&&this.lesson===0)b.cursor={x:0,y:9};
   if(this.mode==='tutorial'&&this.lesson===1){b.grid=b.grid.map(r=>r.map(()=>0));b.grid[11]=[1,1,2,1,3,4];}
   if(this.mode==='tutorial'&&this.lesson===4){b.grid=b.grid.map(r=>r.map(()=>0));b.grid[11]=[1,1,2,1,3,4];b.dropGarbage(6);}
-  if(this.mode==='tutorial'&&this.lesson>=5){b.flux=100;if(this.lesson===5)b.receive(12,30);}
+  if(this.mode==='tutorial'&&[5,6].includes(this.lesson)){b.flux=100;if(this.lesson===5)b.receive(12,30);}
   if(this.mode==='tutorial'&&this.lesson===3)this.player.board=comboBoard();
+  if(this.mode==='tutorial'&&this.lesson>=7)this.prepareCombat(['queue','reversal','cascade'][this.lesson-7]);
   if(this.mode==='practice'&&this.options.glitch==='training')b.dropGarbage(6);
   const now=Date.now();this.emit({type:'start',training:true,resumed:true,matchId:this.matchId,total:2,humans:1,bots:1,mode:'duel',ruleset:'classic',serverNow:now,startAt:now-1,countdownAt:now-3001});this.status();this.snapshot();
  }
- status(){this.emit({type:'trainingStatus',mode:this.mode,lesson:this.lesson,done:this.done,paused:this.paused,title:this.mode==='tutorial'?LESSONS[this.lesson][0]:'RELAXED PRACTICE',instruction:this.done?'Great! Choose NEXT, or try again.':this.mode==='tutorial'?LESSONS[this.lesson][1]:'Move. Swap. Match. Try a combo or chain!',actions:[...this.actions],recoveries:this.recoveries,options:this.options});}
+ prepareCombat(kind){
+  this.player.board=kind==='queue'?comboBoard():cascadeBoard();const b=this.player.board;
+  this.scenario=kind;this.actions.delete('swap');
+  if(kind!=='cascade')b.receive(6,kind==='reversal'?.8:4,{sourceId:this.opponent.id,sourceSeat:2});
+ }
+ status(){this.emit({type:'trainingStatus',mode:this.mode,lesson:this.lesson,done:this.done,paused:this.paused,title:this.mode==='tutorial'?LESSONS[this.lesson][0]:'RELAXED PRACTICE',instruction:this.done?(this.lesson===LESSONS.length-1?'Tutorial complete! Try Practice, or exit to the menu.':'Great! Choose NEXT, or try again.'):this.mode==='tutorial'?LESSONS[this.lesson][1]:(this.scenario?LESSONS[7+['queue','reversal','cascade'].indexOf(this.scenario)][1]:'Move. Swap. Match. Try a combo or chain!'),actions:[...this.actions],recoveries:this.recoveries,options:this.options});}
  complete(){if(!this.done){this.done=true;this.status();this.emit({type:'tutorialSuccess'});}}
  handle(message){
   const b=this.player.board;
   if(message.type==='trainingControl'){
    const action=message.action;
+   if(this.mode==='practice'&&['queue','reversal','cascade'].includes(action)){this.prepareCombat(action);this.paused=false;this.snapshot();this.status();return;}
    if(action==='restart'){this.restart();return;}
-   if(this.mode==='practice'&&['combo','chain'].includes(action)){this.player.board=action==='combo'?comboBoard():seedBoard();this.paused=false;this.snapshot();return;}
+   if(this.mode==='practice'&&['combo','chain'].includes(action)){this.scenario=null;this.player.board=action==='combo'?comboBoard():seedBoard();this.paused=false;this.snapshot();this.status();return;}
    if(action==='pause'){this.paused=!this.paused;this.status();return;}
-   if(action==='attack'&&b.incoming.length<32){b.receive(6,this.mode==='tutorial'?30:4);this.emit({type:'attack',from:this.opponent.name,to:'YOU',sourceId:this.opponent.id,targetId:this.id,amount:6,matchId:this.matchId,attackSequence:++this.serial,eventId:`${this.matchId}:${this.serial}`});this.status();return;}
-   if(action==='next'||action==='back'){this.lesson=Math.max(0,Math.min(6,this.lesson+(action==='next'?1:-1)));this.restart();return;}
-   if(action==='lesson'&&Number.isInteger(message.lesson)&&message.lesson>=0&&message.lesson<7){this.lesson=message.lesson;this.restart();return;}
+   if(action==='attack'&&b.incoming.length<32){b.receive(6,this.mode==='tutorial'?30:4,{sourceId:this.opponent.id,sourceSeat:2});this.emit({type:'attack',from:this.opponent.name,to:'YOU',sourceId:this.opponent.id,targetId:this.id,amount:6,matchId:this.matchId,attackSequence:++this.serial,eventId:`${this.matchId}:${this.serial}`});this.status();return;}
+   if(action==='next'||action==='back'){this.lesson=Math.max(0,Math.min(LESSONS.length-1,this.lesson+(action==='next'?1:-1)));this.restart();return;}
+   if(action==='lesson'&&Number.isInteger(message.lesson)&&message.lesson>=0&&message.lesson<LESSONS.length){this.lesson=message.lesson;this.restart();return;}
   }
   if(this.paused||b.dead)return;
   if(message.type==='target'){this.target=this.opponent.id;this.actions.add('target');}
@@ -73,18 +87,30 @@ export class TrainingSession {
  tick(dt){
   if(this.paused)return;dt=Math.max(0,Math.min(.1,dt));this.elapsed+=dt;
   const b=this.player.board;
+  // Reading time is free in isolated training presets; normal gameplay is unchanged.
+  if(this.scenario&&!this.actions.has('swap'))return;
   if(this.mode==='practice'&&this.options.flux==='unlimited')b.flux=100;
   const speed=this.mode==='tutorial'?(this.lesson===2?.08:0):({off:0,slow:.025,normal:.055,fast:.11}[this.options.rise]||0);
   b.tick(dt,speed,!!this.boost);
   for(const event of b.events.splice(0)){
+   if(event.type==='reversalIntent'){
+    const source=reversalTarget(this.player,this.room,event.sourceId);
+    if(source){source.board.receive(event.amount,COMBAT.incomingDelay,{sourceId:this.id,sourceSeat:1,reflected:true});this.actions.add('reversal');this.emit({type:'reversal',amount:event.amount,to:source.name});if(this.mode==='tutorial'&&this.lesson===8)this.complete();}
+    continue;
+   }
    this.emit({...event,type:event.type==='clear'?'effect':event.type});
    if(this.mode==='tutorial'){
+    if(this.lesson===7&&event.type==='counter'){
+      if(!this.actions.has('partial')){this.actions.add('partial');const pending=structuredClone(b.incoming);this.player.board=comboBoard();this.player.board.incoming=pending;this.status();}
+      else if(!b.incoming.length)this.complete();
+    }
+    if(this.lesson===9&&event.type==='cascade')this.complete();
     if(this.lesson===1&&event.type==='clear')this.complete();
     if(this.lesson===3&&event.type==='clear'&&event.count>=4&&!this.actions.has('combo')){this.actions.add('combo');this.player.board=seedBoard();this.status();}
     if(this.lesson===3&&this.actions.has('combo')&&event.type==='clear'&&event.chain>=2)this.complete();
     if(this.lesson===4&&event.type==='convert'){this.handle({type:'trainingControl',action:'attack'});this.complete();}
    }
-   if(event.attack){this.actions.add('sent');if(this.mode==='tutorial'&&this.lesson===6)this.handle({type:'trainingControl',action:'attack'});this.opponent.board.receive(event.attack);this.emit({type:'sent',from:'YOU',to:this.opponent.name,amount:event.attack,sourceId:this.id,targetId:this.opponent.id,matchId:this.matchId,attackSequence:++this.serial,eventId:`${this.matchId}:${this.serial}`});}
+   if(event.attack){this.actions.add('sent');if(this.mode==='tutorial'&&this.lesson===6)this.handle({type:'trainingControl',action:'attack'});this.opponent.board.receive(event.attack,COMBAT.incomingDelay,{sourceId:this.id,sourceSeat:1});this.emit({type:'sent',from:'YOU',to:this.opponent.name,amount:event.attack,sourceId:this.id,targetId:this.opponent.id,matchId:this.matchId,attackSequence:++this.serial,eventId:`${this.matchId}:${this.serial}`});}
   }
   if(b.dead&&(this.mode==='tutorial'||!this.options.gameOver)){
    // Safe recovery is isolated to this noncompetitive session; no balance changes.
@@ -94,7 +120,7 @@ export class TrainingSession {
  }
  snapshot(){
   const b=this.player.board,now=Date.now();
-  this.emit({type:'state',training:true,matchId:this.matchId,serverNow:now,startAt:now-1,countdownAt:now-3001,phase:'active',countdown:0,mode:'duel',ruleset:'classic',remaining:2,elapsed:this.elapsed,players:[this.player,this.opponent].map((p,i)=>({id:p.id,name:p.name,bot:i===1,number:i+1,grid:p.board.grid.map(r=>[...r]),blocks:structuredClone(p.board.garbageBlocks),dead:p.board.dead,kos:0})),self:{cursor:{...b.cursor},rise:b.rise,matches:[...b.matches],phase:b.phase,falls:b.falls,fallSerial:b.fallSerial,score:b.score,chain:b.chain,bestChain:b.bestChain,danger:b.danger,incoming:structuredClone(b.incoming),kos:0,target:this.target,targetMode:'random',attackTarget:this.target,flux:b.flux,maxFluxHeld:b.maxFluxHeld,activeAbility:b.activeAbility,abilityRemaining:b.abilityRemaining,abilities:abilityStatus(this.player,this.room)}});
+  this.emit({type:'state',training:true,matchId:this.matchId,serverNow:now,startAt:now-1,countdownAt:now-3001,phase:'active',countdown:0,mode:'duel',ruleset:'classic',remaining:2,elapsed:this.elapsed,players:[this.player,this.opponent].map((p,i)=>({id:p.id,name:p.name,bot:i===1,number:i+1,grid:p.board.grid.map(r=>[...r]),blocks:structuredClone(p.board.garbageBlocks),dead:p.board.dead,kos:0})),self:{cursor:{...b.cursor},rise:b.rise,matches:[...b.matches],phase:b.phase,falls:b.falls,fallSerial:b.fallSerial,score:b.score,chain:b.chain,bestChain:b.bestChain,danger:b.danger,incoming:structuredClone(b.incoming),combatVersion:COMBAT.version,reversalCooldown:b.reversalCooldown,kos:0,target:this.target,targetMode:'random',attackTarget:this.target,flux:b.flux,maxFluxHeld:b.maxFluxHeld,activeAbility:b.activeAbility,abilityRemaining:b.abilityRemaining,abilities:abilityStatus(this.player,this.room)}});
  }
 }
 TrainingSession.nextId=0;

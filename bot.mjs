@@ -36,6 +36,8 @@ export function chooseSwap(board,difficulty='normal',random=Math.random){
     let matches=trial.findMatches();
     if(!matches.length){trial.gravity();matches=trial.findMatches();}
     let score=matches.length*100;
+    // Favor real defensive clears when the public queue is urgent; no resource grants.
+    if(matches.length&&board.incoming?.[0]?.delay<=1)score+=Math.min(6,matches.length)*12;
     if(matches.length){
       for(const p of matches){const my=Math.floor(p/COLS),mx=p%COLS;if(my<4)score+=25;for(const [dx,dy]of [[-1,0],[1,0],[0,-1],[0,1]])if(trial.grid[my+dy]?.[mx+dx]===6)score+=40;trial.grid[my][mx]=0;}
       trial.gravity();score+=trial.findMatches().length*75;

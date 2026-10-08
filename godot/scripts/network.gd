@@ -93,7 +93,7 @@ func _process(_delta: float) -> void:
 			var value = JSON.parse_string(socket.get_packet().get_string_from_utf8())
 			if value is Dictionary:
 				if value.get("type") == "hello":
-					if not supports_phase1(value):
+					if not supports_phase1(value) or value.get("combatConfig",{}).get("version",0)!=1:
 						compatibility_error="Outdated game server at %s. Start the current server.mjs, then reconnect in Settings." % server_address
 						player_id="";resume_token="";pending_resume="";connecting=false;was_open=false
 						socket.close(1000,"Incompatible start protocol")
@@ -101,7 +101,7 @@ func _process(_delta: float) -> void:
 						return
 					player_id = str(value.id)
 					resume_token=value.get("resumeToken","")
-					send_message({"type":"session","resumable":true,"startProtocol":1})
+					send_message({"type":"session","resumable":true,"startProtocol":1,"combatVersion":1})
 					sync_clock()
 					if not pending_resume.is_empty(): send_message({"type":"resume","token":pending_resume})
 					connecting = false

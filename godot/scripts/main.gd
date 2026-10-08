@@ -78,6 +78,7 @@ var flux_label: Label
 var ability_timer: Label
 var target_picker: OptionButton
 var flux_config: Dictionary = {}
+var combat_config: Dictionary = {}
 var screen_shake = "normal"
 var flashing_effects = "full"
 var effect_quality="full"
@@ -380,6 +381,7 @@ func show_pause() -> void:
 	body.add_child(button("RESUME",close_modal))
 	body.add_child(button("SETTINGS",show_options))
 	body.add_child(button("CONTROLS",show_help))
+	body.add_child(button("INCOMING QUEUE",show_incoming_queue))
 	body.add_child(button("LEAVE MATCH",func(): network.send_message({"type":"leave"})))
 
 func cycle_strategy() -> void:
@@ -427,15 +429,25 @@ func show_training_pause() -> void:
 		body.add_child(button("PRACTICE SETTINGS",show_practice_menu))
 		body.add_child(button("PRACTICE TOOLS",show_practice_tools))
 	if training_status.get("mode")=="tutorial":
-		if training_status.get("done",false): body.add_child(button("NEXT",func(): close_modal();network.send_message({"type":"trainingControl","action":"next"})))
+		if training_status.get("done",false) and int(training_status.get("lesson",0))<9: body.add_child(button("NEXT",func(): close_modal();network.send_message({"type":"trainingControl","action":"next"})))
 		body.add_child(button("BACK",func(): close_modal();network.send_message({"type":"trainingControl","action":"back"})))
 	body.add_child(button("SETTINGS",show_options))
 	body.add_child(button("CONTROLS",show_help))
+	body.add_child(button("INCOMING QUEUE",show_incoming_queue))
 	body.add_child(button("EXIT",func(): close_modal();network.send_message({"type":"leave"})))
+
+func show_incoming_queue() -> void:
+	var body=open_modal("INCOMING QUEUE")
+	var scroll=ScrollContainer.new();scroll.custom_minimum_size=Vector2(440,280);body.add_child(scroll)
+	var list=VBoxContainer.new();scroll.add_child(list)
+	for packet in snapshot.get("self",{}).get("incoming",[]):
+		list.add_child(label("%d · P%s · %.1fs%s" % [packet.amount,str(packet.get("sourceSeat","—")),maxf(0,packet.delay)," REFLECTED" if packet.get("reflected",false) else ""],18))
+	body.add_child(label("FIFO. Clears pause the counter window.",18))
+	body.add_child(button("BACK",show_pause))
 
 func show_practice_tools() -> void:
 	var body=open_modal("PRACTICE TOOLS")
-	for entry in [["COMBO","combo"],["CHAIN","chain"],["SIMULATE ATTACK","attack"]]:
+	for entry in [["COMBO","combo"],["CHAIN","chain"],["SIMULATE ATTACK","attack"],["COUNTER WINDOW","queue"],["REVERSAL","reversal"],["CASCADE","cascade"]]:
 		var action=entry[1]
 		body.add_child(button(entry[0],func(): close_modal();network.send_message({"type":"trainingControl","action":action})))
 	body.add_child(button("BACK",show_training_pause))
@@ -444,23 +456,23 @@ func refresh_training_hud() -> void:
 	if not training_mode or not is_instance_valid(hud_side): return
 	var tutorial=training_status.get("mode")=="tutorial"
 	var lesson=int(training_status.get("lesson",0))
-	hud.text="TUTORIAL %d / 7" % (lesson+1) if tutorial else "PRACTICE • RELAXED"
-	if is_instance_valid(own_board): own_board.lesson_hint={"x":0 if lesson==3 and not "combo" in training_status.get("actions",[]) else 2,"y":11} if tutorial and lesson in [0,1,3,4] else {}
+	hud.text="TUTORIAL %d / 10" % (lesson+1) if tutorial else "PRACTICE • RELAXED"
+	if is_instance_valid(own_board): own_board.lesson_hint={"x":0 if lesson==7 or (lesson==3 and not "combo" in training_status.get("actions",[])) else 2,"y":11} if tutorial and lesson in [0,1,3,4,7,8,9] else {}
 	flux_group.visible=not tutorial or lesson>=5
-	targeting_controls.visible=tutorial and lesson==6
-	target_label.visible=tutorial and lesson==6
-	rival_scroll.visible=tutorial and lesson==6
+	targeting_controls.visible=tutorial and lesson in [6,8]
+	target_label.visible=tutorial and lesson in [6,8]
+	rival_scroll.visible=tutorial and lesson in [6,8]
 	incoming_label.visible=(not tutorial or lesson>=4) and incoming_label.text!=""
 	hud_side.visible=not tutorial or lesson>=4
 	tutorial_nav.visible=tutorial
-	tutorial_next.visible=training_status.get("done",false)
+	tutorial_next.visible=training_status.get("done",false) and lesson<9
 	if is_instance_valid(training_label):
 		training_label.visible=tutorial
 		training_label.text=str(training_status.get("title",""))+" — "+("NICE!" if training_status.get("done",false) else str(training_status.get("instruction","")))
 
 func show_tutorial_menu() -> void:
 	var body=open_modal("TUTORIAL")
-	var lessons=picker(["1 MOVE & SWAP","2 MATCH THREE","3 RISING STACK","4 COMBOS & CHAINS","5 GLITCH BLOCKS","6 FLUX","7 BATTLE BASICS"])
+	var lessons=picker(["1 MOVE & SWAP","2 MATCH THREE","3 RISING STACK","4 COMBOS & CHAINS","5 GLITCH BLOCKS","6 FLUX","7 BATTLE BASICS","8 COUNTER WINDOW","9 REVERSAL","10 CASCADE"])
 	field(body,"CHOOSE A LESSON — UNLIMITED RETRIES",lessons)
 	body.add_child(button("START TUTORIAL",func(): start_offline("tutorial",lessons.selected,{})))
 	body.add_child(button("BACK",close_modal))
@@ -587,6 +599,7 @@ func show_options() -> void:
 		if not active: audio.set_context("title")
 		close_modal()))
 	body.add_child(button("CONTROLS",show_help))
+	body.add_child(button("INCOMING QUEUE",show_incoming_queue))
 	call_deferred("safe_focus",track_picker)
 
 func show_help() -> void:
@@ -605,7 +618,7 @@ func show_help() -> void:
 	var tutorials=TutorialGallery.new()
 	tutorials.reduced_effects=reduced_motion or flashing_effects=="reduced"
 	content.add_child(tutorials)
-	var text = label("Match 3 matching shapes in a row or column.\nSwap neighbors; falling matches create chains.\nBig combos and chains send Glitch Blocks to rivals.\nClear next to a slab to break it into new tiles.\nEarn Flux with matches, combos, and chains.\nPulse 35: cancel a row or rescue your teammate.\nShift 60: lower a stable board. Surge 75: boost attacks for 8s.\nOverdrive 100: hold full Flux 3s, boost for 10s.\nStay below the ceiling. Last player or team wins.\n\nKEYBOARD\nArrows / WASD: move   Space: swap   Shift: raise   X: Pulse   C: Shift   V: Surge   B: Overdrive\nClick the board: position cursor. Right-click: swap.\n\nGAMEPAD\nD-pad / left stick: move   A / Cross: swap\nRB / R1: raise   X / Square: Pulse\nY / Triangle: Shift   LB / L1: Surge\nLeft trigger: Overdrive\nStart: Options   B / Circle: back",22)
+	var text = label("Match 3 matching shapes in a row or column.\nSwap neighbors; falling matches create chains.\nBig combos and chains send Glitch Blocks to rivals.\nClear next to a slab to break it into new tiles.\nEarn Flux with matches, combos, and chains.\nPulse 35: cancel a row or rescue your teammate.\nShift 60: lower a stable board. Surge 75: boost attacks for 8s.\nOverdrive 100: hold full Flux 3s, boost for 10s.\nStay below the ceiling. Last player or team wins.\n\nPHASE 2\nIncoming packets are FIFO; clears pause their timer.\nChain x2+ full counters in the last second return 3–6 cells.\nReversal cooldown: 8s. Pulse and reflected packets never reflect.\nFalling x3 links earn CASCADE feedback, no extra reward.\n\nKEYBOARD\nArrows / WASD: move   Space: swap   Shift: raise   X: Pulse   C: Shift   V: Surge   B: Overdrive\nClick the board: position cursor. Right-click: swap.\n\nGAMEPAD\nD-pad / left stick: move   A / Cross: swap\nRB / R1: raise   X / Square: Pulse\nY / Triangle: Shift   LB / L1: Surge\nLeft trigger: Overdrive\nStart: Options   B / Circle: back",22)
 	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	content.add_child(text)
 	var back=button("BACK",close_modal)
@@ -840,6 +853,14 @@ func update_snapshot(message: Dictionary) -> void:
 	for packet in own.get("incoming",[]): pending+=int(packet.amount)
 	incoming_label.text="GLITCH INCOMING! %d" % pending if pending>0 else ""
 	incoming_label.visible=pending>0
+	for i in range(mini(4,own.get("incoming",[]).size())):
+		var packet=own.incoming[i]
+		var remaining=maxf(0,float(packet.delay))
+		var segments=clampi(ceili(remaining/float(combat_config.get("incomingDelay",4))*8),0,8)
+		incoming_label.text+="\n%d. %d · P%s · %.1fs %s%s" % [i+1,int(packet.amount),str(packet.get("sourceSeat","—")),remaining,"|".repeat(segments)," URGENT" if remaining<=float(combat_config.get("urgentWindow",1)) else ""]
+	if own.get("incoming",[]).size()>4: incoming_label.text+="\n+%d packets · Pause > Queue" % (own.incoming.size()-4)
+	if own.get("reversalCooldown",0)>0: incoming_label.text+="\nREVERSAL %.1fs" % own.reversalCooldown
+	incoming_label.visible=not incoming_label.text.is_empty()
 	if is_instance_valid(targeting_controls): targeting_controls.get_child(2).text={"random":"RANDOM","danger":"NEAR TOP","attackers":"ATTACKERS","badges":"MOST KOs"}.get(own.get("targetMode","random"),"RANDOM")
 	hud.text = "ALIVE %d   SCORE %d   KOS %d   %02d:%02d" % [message.remaining,own.score,own.kos,int(message.elapsed/60),int(message.elapsed)%60]
 	flux_label.text="FLUX FULL!" if own.get("flux",0)>=flux_config.get("max",100) else "FLUX %d / %d" % [own.get("flux",0),flux_config.get("max",100)]
@@ -921,6 +942,7 @@ func receive(message: Dictionary) -> void:
 		"resumeRejected": snapshot={};show_title();show_error("Session expired. Join a new room.")
 		"hello":
 			flux_config=message.get("fluxConfig",{})
+			combat_config=message.get("combatConfig",{})
 			if not training_pending.is_empty():
 				network.send_message(training_pending);training_pending={}
 		"trainingVictory": audio.effect("win")
@@ -960,6 +982,12 @@ func receive(message: Dictionary) -> void:
 		"break":
 			audio.effect("glitchBreak")
 			if is_instance_valid(own_board): own_board.add_effect("GLITCH BREAK!")
+		"reversal":
+			audio.effect("pulse")
+			if is_instance_valid(own_board): own_board.add_effect("REVERSAL! %d" % message.amount)
+		"cascade":
+			audio.effect("clear",int(message.chain),3)
+			if is_instance_valid(own_board): own_board.add_effect("CASCADE X%d" % message.chain)
 		"counter":
 			audio.effect("flux")
 			if is_instance_valid(own_board): own_board.add_effect("GLITCH COUNTER! +%s FLUX" % message.reward)

@@ -9,20 +9,20 @@ export class AttackTrajectories {
   const channel=message.type==='sent'&&message.sourceId===this.localId?'outgoing':message.type==='attack'&&message.targetId===this.localId?'incoming':null;
   if(!channel)return false;
   this.lastSequence=message.attackSequence;
-  this.events.push({sourceId:message.sourceId,targetId:message.targetId,amount:message.amount,channel,start:now,eventId:message.eventId});
+  this.events.push({sourceId:message.sourceId,targetId:message.targetId,amount:message.amount,channel,personality:message.personality||'normal',reflected:message.reflected===true,start:now,eventId:message.eventId});
   this.events=this.events.slice(-TARGET_VFX.maxActive);return true;
  }
  active(now){this.events=this.events.filter(e=>now-e.start<TARGET_VFX.durationMs+TARGET_VFX.impactMs);return this.events;}
 }
 export function trajectoryPixels(event,now,from,to,{reducedMotion=false,flashing='full'}={}){
  const {pixel,durationMs,impactMs,stepMs,colors}=TARGET_VFX,age=now-event.start;
- if(age<0||age>=durationMs+impactMs)return {rects:[],impact:false,color:colors[event.channel]};
+ if(age<0||age>=durationMs+impactMs)return {rects:[],impact:false,color:colors[event.reflected?'reversal':event.channel]};
  const strength=Math.min(4,Math.max(1,Math.ceil(event.amount/6))),size=pixel*(strength>=3?2:1),progress=Math.min(1,Math.floor(age/stepMs)*stepMs/durationMs);
- const rects=[],count=reducedMotion?9:3+strength;
+ const rects=[],count=reducedMotion?9:event.personality==='burst'?12:event.personality==='segmented'?8:event.personality==='rapid'?6:3+strength;
  for(let n=0;n<count;n++){
   const t=reducedMotion?n/(count-1):progress-n*.045;
   if(t<0||t>1||(!reducedMotion&&age>=durationMs))continue;
   rects.push([Math.round((from.x+(to.x-from.x)*t)/pixel)*pixel,Math.round((from.y+(to.y-from.y)*t)/pixel)*pixel,size,size]);
  }
- return {rects,impact:age>=durationMs,color:flashing==='full'&&age>=durationMs&&Math.floor(age/stepMs)%2===0?'#FFFFFF':colors[event.channel]};
+ return {rects,impact:age>=durationMs,color:flashing==='full'&&age>=durationMs&&Math.floor(age/stepMs)%2===0?'#FFFFFF':colors[event.reflected?'reversal':event.channel]};
 }

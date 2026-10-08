@@ -15,7 +15,7 @@ test('falling panels form a chain and send garbage',()=>{
   b.resolve();b.tick(.5);b.tick(.3);assert.equal(b.chain,2);b.tick(.5);assert.equal(b.events[1].chain,2);assert.equal(b.events[1].attack,6);
 });
 test('attacks cancel queued garbage before sending excess',()=>{
-  const b=empty();b.receive(3);b.receive(2);assert.equal(b.cancel(4),0);assert.deepEqual(b.incoming,[{amount:1,delay:4}]);assert.equal(b.cancel(5),4);assert.equal(b.incoming.length,0);
+  const b=empty();b.receive(3);b.receive(2);assert.equal(b.cancel(4),0);assert.deepEqual(b.incoming.map(({amount,delay})=>({amount,delay})),[{amount:1,delay:4}]);assert.ok(Number.isSafeInteger(b.incoming[0].id));assert.equal(b.cancel(5),4);assert.equal(b.incoming.length,0);
 });
 test('adjacent garbage converts and disconnected garbage remains',()=>{
   const b=empty();b.grid[11]=[1,1,1,6,6,0];b.grid[10][5]=6;b.resolve();b.tick(.5);

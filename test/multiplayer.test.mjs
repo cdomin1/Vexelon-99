@@ -10,7 +10,7 @@ test('real WebSocket clients create, join, play, win on departure, and rematch',
   await Promise.race([once(server.stdout,'data'),new Promise((_,reject)=>setTimeout(()=>reject(new Error('Server did not start')),4000))]);
   const sockets=[];
   function client(){
-    const ws=new WebSocket(`ws://127.0.0.1:${port}/socket`);sockets.push(ws);const messages=[];ws.addEventListener('message',e=>messages.push(JSON.parse(e.data)));
+    const ws=new WebSocket(`ws://127.0.0.1:${port}/socket`);ws.addEventListener('open',()=>ws.send(JSON.stringify({type:'session',combatVersion:1})),{once:true});sockets.push(ws);const messages=[];ws.addEventListener('message',e=>messages.push(JSON.parse(e.data)));
     const wait=async(type,predicate=()=>true)=>{const deadline=Date.now()+6000;while(Date.now()<deadline){const index=messages.findIndex(m=>m.type===type&&predicate(m));if(index>=0)return messages.splice(index,1)[0];await new Promise(r=>setTimeout(r,15));}throw new Error(`Timed out waiting for ${type}`);};
     return {ws,wait,send:msg=>ws.send(JSON.stringify(msg))};
   }

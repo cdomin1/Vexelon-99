@@ -1,3 +1,4 @@
+import {COMBAT,chainPersonality} from './combat-config.mjs';
 import {FLUX,clearFlux} from './flux-config.mjs';
 export const COLS = 6, ROWS = 12, TILE_COUNT = 4;
 export class Board {
@@ -6,6 +7,7 @@ export class Board {
     this.cursor = {x:2,y:9}; this.rise = 0; this.phase = 'idle'; this.timer = 0;
     this.matches = []; this.chain = 0; this.score = 0; this.dead = false; this.danger = 0;
     this.events = []; this.incoming = []; this.totalCleared = 0; this.flux=0;this.balance=balance;this.maxFluxHeld=0;this.activeAbility=null;this.abilityRemaining=0;this.abilityCooldown=0; this.bestChain=0;
+    this.combat=COMBAT;this.reversalCooldown=0;this.nextPacketId=1;this.cascadeAnnounced=false;this.clearOrigin='input';
     this.garbageBlocks=[];this.nextBlockId=1;this.falls=[];this.fallSerial=0;
     for(let y=7;y<ROWS;y++) for(let x=0;x<COLS;x++) this.grid[y][x]=this.color(y,x);
   }
@@ -13,6 +15,7 @@ export class Board {
   get charge(){return this.flux;}
   set charge(value){this.flux=Math.max(0,Math.min(this.balance.max,value));}
   tickAbilities(dt){
+    this.reversalCooldown=Math.max(0,this.reversalCooldown-dt);
     this.abilityCooldown=Math.max(0,this.abilityCooldown-dt);
     if(this.activeAbility){
       this.abilityRemaining=Math.max(0,this.abilityRemaining-dt);
@@ -28,7 +31,7 @@ export class Board {
     for(const block of this.garbageBlocks){block.y++;block.height=Math.min(block.height,ROWS-block.y);}
     this.garbageBlocks=this.garbageBlocks.filter(b=>b.height>0);
     this.cursor.y=Math.min(ROWS-1,this.cursor.y+1);
-    this.rise=0;this.danger=0;this.chain=0;this.matches=[];this.falls=[];this.fallSerial++;
+    this.rise=0;this.danger=0;this.chain=0;this.cascadeAnnounced=false;this.matches=[];this.falls=[];this.fallSerial++;
   }
   color(y,x) {
     let choices=[1,2,3,4].filter(c=>!(x>=2&&this.grid[y][x-1]===c&&this.grid[y][x-2]===c)&&!(y>=2&&this.grid[y-1][x]===c&&this.grid[y-2][x]===c));
@@ -40,7 +43,7 @@ export class Board {
     const {x,y}=this.cursor,a=this.grid[y][x],b=this.grid[y][x+1];
     if(a===6||b===6||(!a&&!b))return false;
     [this.grid[y][x],this.grid[y][x+1]]=[b,a];
-    if(this.phase!=='grace')this.chain=0; this.resolve();return true;
+    if(this.phase!=='grace'){this.chain=0;this.cascadeAnnounced=false;} this.resolve('input');return true;
   }
   findMatches() {
     const set=new Set();
@@ -76,16 +79,16 @@ export class Board {
     if(changed)this.fallSerial=(this.fallSerial||0)+1;
     return changed;
   }
-  resolve() {
+  resolve(origin='resolution') {
     this.matches=this.findMatches();
-    if(this.matches.length){this.chain++;this.phase='clear';this.timer=.42;}
-    else if(this.gravity()){this.phase='fall';this.timer=.16;}
+    if(this.matches.length){this.clearOrigin=origin;this.chain++;this.phase='clear';this.timer=.42;}
+    else if(this.gravity()){this.pendingFall=true;this.phase='fall';this.timer=.16;}
     else if(this.chain>0&&this.phase!=='grace'){this.phase='grace';this.timer=this.balance.chainGrace+(this.modifiers.chainGrace||0);}
-    else {this.phase='idle';this.chain=0;}
+    else {this.phase='idle';this.chain=0;this.cascadeAnnounced=false;}
   }
-  receive(amount, delay=4) {if(!this.dead)this.incoming.push({amount,delay});}
-  cancel(amount) {
-    while(amount>0&&this.incoming.length){const hit=Math.min(amount,this.incoming[0].amount);amount-=hit;this.incoming[0].amount-=hit;if(!this.incoming[0].amount)this.incoming.shift();}
+  receive(amount, delay=this.combat.incomingDelay, metadata={}) {if(!this.dead)this.incoming.push({amount,delay,id:this.nextPacketId++,originalAmount:amount,sourceId:metadata.sourceId||null,sourceSeat:metadata.sourceSeat||null,reflected:metadata.reflected===true});}
+  cancel(amount, onPacket=null) {
+    while(amount>0&&this.incoming.length){const packet={...this.incoming[0]},hit=Math.min(amount,packet.amount);if(onPacket)onPacket(packet,hit===packet.amount);amount-=hit;this.incoming[0].amount-=hit;if(!this.incoming[0].amount)this.incoming.shift();}
     return amount;
   }
   dropGarbage(amount) {
@@ -140,8 +143,14 @@ export class Board {
           }
           for(const p of adjacent)if(!grouped.has(p))this.grid[Math.floor(p/COLS)][p%COLS]=1+Math.floor(this.random()*TILE_COUNT);
           const attack=(count>3?count-1:0)+(this.chain>1?(this.chain-1)*6:0);
-          const generated=Math.round(attack*(this.modifiers.attack||1)),outgoing=this.cancel(generated),cancelled=generated-outgoing;
-          this.events.push({type:'clear',count,chain:this.chain,attack:outgoing,positions:[...this.matches]});
+          const generated=Math.round(attack*(this.modifiers.attack||1));let reversal=null;
+          const outgoing=this.cancel(generated,(packet,full)=>{
+            const rule=this.combat.reversal,amount=Math.min(rule.max,Math.floor(packet.amount*rule.ratio));
+            if(!reversal&&this.reversalCooldown<=1e-8&&this.chain>=rule.chain&&full&&!packet.reflected&&packet.delay>=0&&packet.delay<=this.combat.urgentWindow+1e-8&&amount>=rule.min){reversal={type:'reversalIntent',packetId:packet.id,sourceId:packet.sourceId,amount};this.reversalCooldown=rule.cooldown;}
+          }),cancelled=generated-outgoing;
+          const cascade=!this.cascadeAnnounced&&this.chain>=this.combat.cascadeChain&&this.clearOrigin==='fall';if(cascade)this.cascadeAnnounced=true;
+          this.events.push({type:'clear',count,chain:this.chain,attack:outgoing,personality:chainPersonality(this.chain),positions:[...this.matches]});
+          if(reversal)this.events.push(reversal);if(cascade)this.events.push({type:'cascade',chain:this.chain,positions:[...this.matches]});
           // One counter reward per resolving attack, even when it offsets several packets.
           // Pulse is a separate paid defense and never refunds its own cost.
           if(cancelled>0){
@@ -150,8 +159,8 @@ export class Board {
             this.events.push({type:'counter',cancelled,reward});
           }
           if(breaking.length)this.events.push({type:'break',blocks:breaking});
-          this.matches=[];this.gravity();this.phase='fall';this.timer=.2;
-        }else this.resolve();
+          this.matches=[];this.pendingFall=this.gravity();this.phase='fall';this.timer=.2;
+        }else this.resolve(this.phase==='fall'&&this.pendingFall?'fall':'resolution');
       }
       return;
     }
@@ -165,7 +174,7 @@ export class Board {
       this.rise-=1;this.grid.shift();this.grid.push(Array(COLS).fill(0));
       for(const block of this.garbageBlocks)block.y--;
       for(let x=0;x<COLS;x++)this.grid[ROWS-1][x]=this.color(ROWS-1,x);
-      this.cursor.y=Math.max(0,this.cursor.y-1);this.resolve();
+      this.cursor.y=Math.max(0,this.cursor.y-1);this.resolve('rise');
     }
   }
 }

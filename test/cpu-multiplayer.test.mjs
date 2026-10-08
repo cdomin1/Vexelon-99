@@ -6,7 +6,7 @@ test('CPU-only battle, host controls, capacity, host transfer, and abandoned roo
   const game=createGameServer({port:0,host:'127.0.0.1'}),url=await game.listen(),sockets=[];
   t.after(async()=>{for(const ws of sockets)ws.close();await game.close();});
   function client(){
-    const ws=new WebSocket(url.replace('http:','ws:')+'/socket');sockets.push(ws);const messages=[];ws.addEventListener('message',event=>messages.push(JSON.parse(event.data)));
+    const ws=new WebSocket(url.replace('http:','ws:')+'/socket');ws.addEventListener('open',()=>ws.send(JSON.stringify({type:'session',combatVersion:1})),{once:true});sockets.push(ws);const messages=[];ws.addEventListener('message',event=>messages.push(JSON.parse(event.data)));
     const wait=async(type,predicate=()=>true)=>{const deadline=Date.now()+6500;while(Date.now()<deadline){const i=messages.findIndex(m=>m.type===type&&predicate(m));if(i>=0)return messages.splice(i,1)[0];await new Promise(resolve=>setTimeout(resolve,15));}throw new Error(`Timed out waiting for ${type}`);};
     return {ws,wait,send:msg=>ws.send(JSON.stringify(msg))};
   }

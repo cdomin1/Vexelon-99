@@ -5,7 +5,7 @@ import {createGameServer} from '../server.mjs';
 test('offline assistance cannot be enabled on a public bind or requested in competitive rooms',async()=>{
  assert.throws(()=>createGameServer({training:true,host:'0.0.0.0'}),/loopback/);
  const game=createGameServer({port:0,host:'127.0.0.1'}),messages=[];
- const url=await game.listen();const ws=new WebSocket(url.replace('http','ws')+'/socket');
+ const url=await game.listen();const ws=new WebSocket(url.replace('http','ws')+'/socket');ws.addEventListener('open',()=>ws.send(JSON.stringify({type:'session',combatVersion:1})),{once:true});
  ws.addEventListener('message',event=>messages.push(JSON.parse(event.data)));
  const wait=async type=>{for(let i=0;i<100;i++){const found=messages.find(m=>m.type===type);if(found)return found;await new Promise(r=>setTimeout(r,10));}throw Error('Missing '+type);};
  try{

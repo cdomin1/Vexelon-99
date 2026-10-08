@@ -39,7 +39,7 @@ export function recordMechanic(id,{fps=10}={}){
 }
 async function recordMode(url,mode,bots){
  return new Promise((resolve,reject)=>{
-  const socket=new WebSocket(url.replace('http','ws')+'/socket'),frames=[],events=[];let id,plan;
+  const socket=new WebSocket(url.replace('http','ws')+'/socket'),frames=[],events=[];socket.addEventListener('open',()=>socket.send(JSON.stringify({type:'session',combatVersion:1})),{once:true});let id,plan;
   const timeout=setTimeout(()=>{socket.close();reject(Error(`Recording ${mode} timed out`))},20000);
   socket.addEventListener('error',()=>{clearTimeout(timeout);reject(Error('Tutorial socket failed'))});
   socket.addEventListener('message',({data})=>{

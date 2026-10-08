@@ -1,6 +1,6 @@
 # Phase 2 / Phase 3 rules — decision draft
 
-Status: **PROPOSED; NOT APPROVED FOR GAMEPLAY IMPLEMENTATION.**
+Status: **PHASE 2 APPROVED by the user on 2026-10-08 (P2-1 through P2-4 and their tutorial/acceptance requirements). Phase 3 remains PROPOSED and DISABLED.**
 Prepared 2026-10-08. Inspected clean `feature/phase-1-verification` at `77258cd`. The new user request supersedes older Phase 2/3 exclusions only. Phase 4, automatic merges and deployment remain excluded. Push is still deferred. Subsequent WASD work is separately authorized and does not approve any rules below.
 
 ## A. Verified existing behavior

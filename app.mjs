@@ -279,8 +279,8 @@ document.addEventListener('keydown',e=>{
   if(e.code==='Escape'&&playing&&!document.querySelector('dialog[open]')){e.preventDefault();openPause();return;}
   if(!playing||document.querySelector('dialog[open]')||['INPUT','SELECT'].includes(document.activeElement?.tagName))return;
   if(!e.repeat&&['KeyQ','KeyE','KeyT'].includes(e.code)){e.preventDefault();e.code==='KeyT'?cycleStrategy():cycleTarget(e.code==='KeyQ'?-1:1);return;}
-  const moves={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
-  if(moves[e.key]){e.preventDefault();const [dx,dy]=moves[e.key];send({type:'move',dx,dy});}
+  const moves={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1],KeyA:[-1,0],KeyD:[1,0],KeyW:[0,-1],KeyS:[0,1]};
+  if(moves[e.code]){e.preventDefault();const [dx,dy]=moves[e.code];send({type:'move',dx,dy});}
   if(e.code==='Space'){e.preventDefault();if(!e.repeat)send({type:'swap'});}
   const ability={KeyX:'pulse',KeyC:'shift',KeyV:'surge',KeyB:'overdrive'}[e.code];
   if(ability){e.preventDefault();if(!e.repeat)requestAbility(ability);}

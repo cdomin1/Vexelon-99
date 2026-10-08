@@ -605,7 +605,7 @@ func show_help() -> void:
 	var tutorials=TutorialGallery.new()
 	tutorials.reduced_effects=reduced_motion or flashing_effects=="reduced"
 	content.add_child(tutorials)
-	var text = label("Match 3 matching shapes in a row or column.\nSwap neighbors; falling matches create chains.\nBig combos and chains send Glitch Blocks to rivals.\nClear next to a slab to break it into new tiles.\nEarn Flux with matches, combos, and chains.\nPulse 35: cancel a row or rescue your teammate.\nShift 60: lower a stable board. Surge 75: boost attacks for 8s.\nOverdrive 100: hold full Flux 3s, boost for 10s.\nStay below the ceiling. Last player or team wins.\n\nKEYBOARD\nArrows: move   Space: swap   Shift: raise   X: Pulse   C: Shift   V: Surge   B: Overdrive\nClick the board: position cursor. Right-click: swap.\n\nGAMEPAD\nD-pad / left stick: move   A / Cross: swap\nRB / R1: raise   X / Square: Pulse\nY / Triangle: Shift   LB / L1: Surge\nLeft trigger: Overdrive\nStart: Options   B / Circle: back",22)
+	var text = label("Match 3 matching shapes in a row or column.\nSwap neighbors; falling matches create chains.\nBig combos and chains send Glitch Blocks to rivals.\nClear next to a slab to break it into new tiles.\nEarn Flux with matches, combos, and chains.\nPulse 35: cancel a row or rescue your teammate.\nShift 60: lower a stable board. Surge 75: boost attacks for 8s.\nOverdrive 100: hold full Flux 3s, boost for 10s.\nStay below the ceiling. Last player or team wins.\n\nKEYBOARD\nArrows / WASD: move   Space: swap   Shift: raise   X: Pulse   C: Shift   V: Surge   B: Overdrive\nClick the board: position cursor. Right-click: swap.\n\nGAMEPAD\nD-pad / left stick: move   A / Cross: swap\nRB / R1: raise   X / Square: Pulse\nY / Triangle: Shift   LB / L1: Surge\nLeft trigger: Overdrive\nStart: Options   B / Circle: back",22)
 	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	content.add_child(text)
 	var back=button("BACK",close_modal)
@@ -997,6 +997,10 @@ func setup_actions() -> void:
 		pad.device = -1
 		pad.button_index = bindings[action][1]
 		if bindings[action][1]>=0: InputMap.action_add_event(action,pad)
+	for entry in [["game_left",KEY_A],["game_right",KEY_D],["game_up",KEY_W],["game_down",KEY_S]]:
+		var alias=InputEventKey.new()
+		alias.physical_keycode=entry[1]
+		if not InputMap.action_has_event(entry[0],alias): InputMap.action_add_event(entry[0],alias)
 	var trigger = InputEventJoypadMotion.new()
 	trigger.device=-1
 	trigger.axis=JOY_AXIS_TRIGGER_LEFT

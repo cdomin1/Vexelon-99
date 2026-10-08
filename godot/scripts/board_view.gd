@@ -230,6 +230,10 @@ func draw_tile(view: Control, value: int, point: Vector2) -> void:
 	if value<1 or value>4: return
 	paint_vector_tile(view,value,Rect2(point,Vector2(60,60)),Color.WHITE)
 
+func phosphor_pulse() -> float:
+	if reduce_motion or fx.flashing!="full": return float(neo.phosphor.low)
+	return lerpf(neo.phosphor.low,neo.phosphor.high,.5-.5*cos(clock*1000.0/neo.phosphor.periodMs*TAU))
+
 func paint_vector_tile(view: Control, value: int, rect: Rect2, modulation: Color) -> void:
 	if value<1 or value>4: return
 	var tile: Dictionary = neo.tiles[value-1]
@@ -248,7 +252,7 @@ func paint_vector_tile(view: Control, value: int, rect: Rect2, modulation: Color
 		var line=2.8 if value==3 else 2.0
 		if not miniature and fx.quality!="minimal":
 			for pass_data in neo.phosphor.halo:
-				var halo=color;halo.a*=pass_data.alpha
+				var halo=color;halo.a*=pass_data.alpha*phosphor_pulse()
 				view.draw_polyline(points,halo,line+pass_data.spread,true)
 		view.draw_polyline(points,color,line,true)
 		if not miniature and fx.quality!="minimal":
@@ -316,7 +320,7 @@ func block_y(block: Dictionary) -> float:
 func _draw() -> void:
 	material=null if miniature or fx.quality=="minimal" else bloom_material
 	if bloom_material:
-		bloom_material.set_shader_parameter("bloom_strength",0.0 if miniature or fx.quality=="minimal" else (.45 if fx.quality=="reduced" else .9))
+		bloom_material.set_shader_parameter("bloom_strength",0.0 if miniature or fx.quality=="minimal" else (.10 if fx.quality=="reduced" else .20)*phosphor_pulse())
 		var impact=0.0
 		if not reduce_motion and fx.flashing=="full":
 			for burst in impact_bursts: impact=maxf(impact,1-burst.age/.52)

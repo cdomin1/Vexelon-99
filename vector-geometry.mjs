@@ -1,7 +1,7 @@
 import {NEO} from './neo-vector.mjs';
 // Normalized geometry shared with the native renderer. No gameplay state mutation.
 export function tilePaths(value){return NEO.geometry[NEO.tiles[value-1]?.geometry]||[];}
-export function drawVectorTile(ctx,value,x,y,size,{intensity=1,matching=false,mini=false,tone=null,glow=true}={}){
+export function drawVectorTile(ctx,value,x,y,size,{intensity=1,matching=false,mini=false,tone=null,glow=true,now=0,reducedMotion=false}={}){
   const tile=NEO.tiles[value-1];if(!tile)return;
   ctx.save();ctx.translate(x,y);
   ctx.fillStyle=NEO.colors.background;ctx.fillRect(2,2,size-4,size-4);
@@ -9,13 +9,13 @@ export function drawVectorTile(ctx,value,x,y,size,{intensity=1,matching=false,mi
   ctx.globalAlpha=intensity;ctx.strokeStyle=color;
   const line=Math.max(mini?1:1.2,size/60*(value===3?2.8:2));
   ctx.lineJoin='round';ctx.lineCap='round';
-  if(!mini&&glow){ctx.shadowColor=color;ctx.shadowBlur=size*.14;}
+  const pulse=reducedMotion?NEO.phosphor.low:NEO.phosphor.low+(NEO.phosphor.high-NEO.phosphor.low)*(.5-.5*Math.cos(now/NEO.phosphor.periodMs*Math.PI*2));
   const pad=size*.12,extent=size-pad*2;
   for(const [index,{points}]of tilePaths(value).entries()){
     if(mini&&intensity<.5&&index>0&&tile.geometry!=='chevrons')continue;
     ctx.beginPath();points.forEach(([px,py],i)=>i?ctx.lineTo(pad+px*extent,pad+py*extent):ctx.moveTo(pad+px*extent,pad+py*extent));
-    if(!mini&&glow)for(const pass of NEO.phosphor.halo){ctx.lineWidth=line+pass.spread*size/60;ctx.globalAlpha=intensity*pass.alpha;ctx.stroke();}
-    ctx.globalAlpha=intensity;ctx.lineWidth=line;ctx.strokeStyle=color;ctx.stroke();
+    if(!mini&&glow)for(const pass of NEO.phosphor.halo){ctx.lineWidth=line+pass.spread*size/60;ctx.globalAlpha=intensity*pass.alpha*pulse;ctx.shadowColor=color;ctx.shadowBlur=size*.04*pulse;ctx.stroke();}
+    ctx.shadowBlur=0;ctx.globalAlpha=intensity;ctx.lineWidth=line;ctx.strokeStyle=color;ctx.stroke();
     if(!mini&&glow){ctx.lineWidth=NEO.phosphor.core*size/60;ctx.globalAlpha=intensity*NEO.phosphor.coreAlpha;ctx.strokeStyle=NEO.colors.neutral;ctx.stroke();ctx.strokeStyle=color;}
   }
   ctx.restore();

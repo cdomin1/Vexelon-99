@@ -1788,23 +1788,22 @@
   "phosphor": {
     "halo": [
       {
-        "spread": 16,
+        "spread": 8,
         "alpha": 0.035
       },
       {
-        "spread": 10,
+        "spread": 4,
         "alpha": 0.08
       },
       {
-        "spread": 6,
-        "alpha": 0.18
-      },
-      {
-        "spread": 3,
-        "alpha": 0.35
+        "spread": 2,
+        "alpha": 0.14
       }
     ],
-    "core": 1.1,
-    "coreAlpha": 0.92
+    "core": 0.65,
+    "coreAlpha": 0.5,
+    "periodMs": 2800,
+    "low": 0.55,
+    "high": 1.2
   }
 }

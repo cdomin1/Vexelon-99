@@ -25,3 +25,9 @@ Added `godot/shaders/vector_bloom.gdshader`: a board-texture bloom compositor us
 Both clients now render rotating vector shards, a short cross flare reaching outward from the actual clear, and rising score text for combo/chain impacts using the established `count × 10 × chain` award. Strong chains use red impact emphasis. Swaps and falls interpolate continuously over their existing durations instead of quantizing to a few visual steps. Gameplay simulation, input authority and timings remain unchanged. The selector is still drawn last.
 
 Fresh verification: 114/114 JavaScript tests pass, zero failures/skips. Native real-swap/clear/Counter integration passes with no shader/script errors after fixing shader built-in scoping. Headless shader parsing is not GPU performance or visual certification. Attempts to launch through the already-open editor produced no running preview; native graphical appearance and measured GPU frame times remain UNVERIFIED. No integrated-GPU performance claim is made from these checks. The looped Web comparison preview was refreshed to the current renderer. GitHub push/Render deployment remain deferred.
+
+## Breathing halo / clarity correction
+
+Reduced the constant phosphor spread, opacity and white core that made the shapes look muddy. Stable colored outlines now stay crisp while the halo breathes on a shared 2.8-second cosine envelope. Web blur applies only to halo passes, not to the core strokes. Native idle GPU bloom is substantially lower; the existing event-driven impact boost remains separate. Reduced Motion/Reduced Flash use the low, steady halo; mini-boards and Minimal quality retain their cheaper rendering paths.
+
+Native real-clear/Counter integration passes without shader errors. The Web preview was refreshed and visually checked for sharper outlines. Native final appearance still requires an on-screen review after relaunch; headless verification alone cannot establish it.

@@ -16,7 +16,7 @@ export const NEO = {
     "letterSpacingEm": 0.02,
     "nativeSize": 24
 },
-  "phosphor": {"halo": [{"spread": 16, "alpha": 0.035}, {"spread": 10, "alpha": 0.08}, {"spread": 6, "alpha": 0.18}, {"spread": 3, "alpha": 0.35}], "core": 1.1, "coreAlpha": 0.92},
+  "phosphor": {"halo": [{"spread": 8, "alpha": 0.035}, {"spread": 4, "alpha": 0.08}, {"spread": 2, "alpha": 0.14}], "core": 0.65, "coreAlpha": 0.5, "periodMs": 2800, "low": 0.55, "high": 1.2},
   "opponents": {
     "activeIntensity": 0.7,
     "targetIntensity": 0.95,

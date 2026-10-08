@@ -43,3 +43,20 @@ button,label,select,summary{font-weight:var(--ui-medium)}h1,h2,strong,.board-ove
 .br-grid .rival.attack-source small{color:#FF2A55}
 .br-grid .rival.dead{opacity:1}.br-grid .rival.dead canvas{opacity:.1;outline:1px solid #526F82;outline-offset:0}.br-grid .rival.dead small{opacity:.15;color:#8EB6C8}
 @media(max-width:800px){.br-grid{--field-rows:14}}
+
+/* Luminous arcade surfaces, inspired by the supplied visual reference.
+   The board stays black; phosphor accents identify actions rather than frame it. */
+.home-wordmark{filter:drop-shadow(0 0 12px #00e5ff30)}
+.entry #play-cpu{width:100%;padding:12px 20px;text-align:center;color:#9bfbff;border:1px solid #00e5ff;border-radius:10px 0;background:#06212a;box-shadow:inset 0 0 20px #00e5ff12,0 0 16px #00e5ff18}
+.entry #play-cpu:hover,.entry #play-cpu:focus-visible{background:#09343e;box-shadow:0 0 22px #00e5ff30}
+.entry .title-menu nav button{padding:8px 14px;border-left:1px solid #31516a}
+.ability-grid{gap:10px}
+.ability-grid button{--ability:#00e5ff;position:relative;min-height:64px;padding:8px 5px;text-align:center;border:1px solid color-mix(in srgb,var(--ability) 45%,transparent);border-radius:10px 0;background:#06151d;color:var(--ability);font-weight:500;line-height:1.4}
+.ability-grid #surge{--ability:#2bf06a}.ability-grid #overdrive{--ability:#ffaa00}
+.ability-grid button:not(:disabled){box-shadow:inset 0 0 16px color-mix(in srgb,var(--ability) 7%,transparent),0 0 12px color-mix(in srgb,var(--ability) 12%,transparent)}
+.ability-grid button:disabled{color:#8ca3b8;opacity:.5;background:transparent;box-shadow:none;border-color:#203346}
+.ability-grid button::before{content:'◇';display:block;font-size:24px;line-height:1.15;margin-bottom:4px}
+.ability-grid #pulse::before{content:'◉'}.ability-grid #surge::before{content:'✧'}.ability-grid #overdrive::before{content:'◎'}
+#flux-meter{height:14px;border-radius:7px 0;overflow:hidden;box-shadow:0 0 12px #00e5ff18}
+.board-overlay strong{color:#e5fcff;text-shadow:0 0 20px #00e5ff60}
+#board-status:not(:empty){border-bottom:1px solid currentColor;padding-bottom:3px;font-weight:700}

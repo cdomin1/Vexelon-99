@@ -140,7 +140,15 @@ export class Board {
           }
           for(const p of adjacent)if(!grouped.has(p))this.grid[Math.floor(p/COLS)][p%COLS]=1+Math.floor(this.random()*TILE_COUNT);
           const attack=(count>3?count-1:0)+(this.chain>1?(this.chain-1)*6:0);
-          this.events.push({type:'clear',count,chain:this.chain,attack:this.cancel(Math.round(attack*(this.modifiers.attack||1))),positions:[...this.matches]});
+          const generated=Math.round(attack*(this.modifiers.attack||1)),outgoing=this.cancel(generated),cancelled=generated-outgoing;
+          this.events.push({type:'clear',count,chain:this.chain,attack:outgoing,positions:[...this.matches]});
+          // One counter reward per resolving attack, even when it offsets several packets.
+          // Pulse is a separate paid defense and never refunds its own cost.
+          if(cancelled>0){
+            const reward=this.balance.counter*(this.modifiers.generation||1);
+            this.flux=Math.min(this.balance.max,this.flux+reward);
+            this.events.push({type:'counter',cancelled,reward});
+          }
           if(breaking.length)this.events.push({type:'break',blocks:breaking});
           this.matches=[];this.gravity();this.phase='fall';this.timer=.2;
         }else this.resolve();
@@ -153,7 +161,7 @@ export class Board {
     this.danger=high?this.danger+dt:0;if(this.danger>2){this.dead=true;return;}
     this.rise+=dt*(boost?1.4:speed*(this.modifiers.rise||1));
     if(this.rise>=1){
-      if(high){this.danger+=dt;this.rise=1;return;}
+      if(high){this.rise=1;return;}
       this.rise-=1;this.grid.shift();this.grid.push(Array(COLS).fill(0));
       for(const block of this.garbageBlocks)block.y--;
       for(let x=0;x<COLS;x++)this.grid[ROWS-1][x]=this.color(ROWS-1,x);

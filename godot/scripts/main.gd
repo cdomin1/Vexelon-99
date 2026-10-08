@@ -164,7 +164,9 @@ func style(fill: Color, border: Color) -> StyleBoxFlat:
 	var box = StyleBoxFlat.new()
 	box.bg_color = fill
 	box.border_color = border
-	box.set_border_width_all(2)
+	box.set_border_width_all(1)
+	box.corner_radius_top_left=8
+	box.corner_radius_bottom_right=8
 	box.content_margin_left = 16
 	box.content_margin_right = 16
 	box.content_margin_top = 8
@@ -306,6 +308,7 @@ func show_title() -> void:
 	menu.add_child(button("HOW TO PLAY",show_help))
 	if not OS.has_feature("web"): menu.add_child(button("QUIT",exit_game))
 	status_label=label("" if not network.player_id.is_empty() else "CONNECTING...",18)
+	status_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	status_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
 	shell.add_child(status_label)
 	call_deferred("safe_focus",first)
@@ -406,7 +409,7 @@ func show_setup(quick: bool) -> void:
 		cpu_picker.disabled = index!=0
 		if index!=0: cpu_picker.select(0 if index==1 else 1))
 	body.add_child(button("START BATTLE" if quick else "CREATE ROOM",func():
-		if network.player_id.is_empty(): show_error("Connect to the server in Options first.");return
+		if network.player_id.is_empty(): show_error(network.compatibility_error if not network.compatibility_error.is_empty() else "Connect to the server in Settings first.");return
 		var count = [1,3,9,24,98][cpu_picker.selected] if quick else 0
 		settings.set_value("player","name",name_input.text)
 		save_preferences()
@@ -736,6 +739,11 @@ func show_arena(message: Dictionary) -> void:
 	for kind in ["pulse","shift","surge","overdrive"]:
 		var ability=kind
 		var action_button=button(kind.to_upper(),func(): network.send_ability(ability))
+		var accent=Color(neo.colors.flux if kind in ["pulse","shift"] else (neo.tiles[2].color if kind=="surge" else neo.colors.target))
+		action_button.add_theme_stylebox_override("normal",style(Color("#06151D"),accent.darkened(.45)))
+		action_button.add_theme_stylebox_override("focus",style(Color.TRANSPARENT,accent))
+		action_button.add_theme_stylebox_override("disabled",style(Color.TRANSPARENT,Color("#203346")))
+		action_button.custom_minimum_size.y=64
 		action_button.add_theme_font_size_override("font_size",16)
 		action_button.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 		action_button.disabled=true
@@ -817,6 +825,9 @@ func update_snapshot(message: Dictionary) -> void:
 		var flux=message.self.get("flux",0)
 		var before=previous.get("flux",0)
 		if message.self.get("abilities",{}).get("overdrive",false) and not previous.get("abilities",{}).get("overdrive",false): audio.effect("overdriveReady")
+		if previous.get("activeAbility")!=null and message.self.get("activeAbility")==null:
+			audio.effect("flux")
+			if is_instance_valid(own_board): own_board.add_effect(str(previous.activeAbility).to_upper()+" COMPLETE")
 		if message.self.get("kos",0)>previous.get("kos",0): audio.effect("ko")
 		if flux>=100 and before<100: audio.effect("ready")
 		elif [35,60,75].any(func(value): return before<value and flux>=value): audio.effect("flux")
@@ -832,9 +843,8 @@ func update_snapshot(message: Dictionary) -> void:
 	if is_instance_valid(targeting_controls): targeting_controls.get_child(2).text={"random":"RANDOM","danger":"NEAR TOP","attackers":"ATTACKERS","badges":"MOST KOs"}.get(own.get("targetMode","random"),"RANDOM")
 	hud.text = "ALIVE %d   SCORE %d   KOS %d   %02d:%02d" % [message.remaining,own.score,own.kos,int(message.elapsed/60),int(message.elapsed)%60]
 	flux_label.text="FLUX FULL!" if own.get("flux",0)>=flux_config.get("max",100) else "FLUX %d / %d" % [own.get("flux",0),flux_config.get("max",100)]
-	var keys={"pulse":"WEST FACE","shift":"NORTH FACE","surge":"LB","overdrive":"LT"} if last_input=="gamepad" else {"pulse":"X","shift":"C","surge":"V","overdrive":"B"}
 	for kind in ability_buttons:
-		ability_buttons[kind].text="%s %d / %s" % [kind.to_upper(),flux_config.get(kind,{}).get("cost",0),keys[kind]]
+		ability_buttons[kind].text="%s %d" % [kind.to_upper(),flux_config.get(kind,{}).get("cost",0)]
 		ability_buttons[kind].disabled=not own.get("abilities",{}).get(kind,false) or message.countdown>0 or finished
 	var effect=own.get("activeAbility")
 	ability_timer.text=("%s %.1fs" % [str(effect).to_upper(),own.abilityRemaining]) if effect!=null else (("OVERDRIVE %.1fs" % maxf(0,flux_config.get("overdrive",{}).get("hold",3)-own.get("maxFluxHeld",0))) if own.get("flux",0)>=flux_config.get("max",100) else "")
@@ -950,6 +960,9 @@ func receive(message: Dictionary) -> void:
 		"break":
 			audio.effect("glitchBreak")
 			if is_instance_valid(own_board): own_board.add_effect("GLITCH BREAK!")
+		"counter":
+			audio.effect("flux")
+			if is_instance_valid(own_board): own_board.add_effect("GLITCH COUNTER! +%s FLUX" % message.reward)
 		"pulse":
 			audio.effect("pulse")
 			if is_instance_valid(own_board): own_board.add_effect("TEAM RESCUE!" if message.get("assist",false) else "PULSE!")

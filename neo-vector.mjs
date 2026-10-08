@@ -16,6 +16,11 @@ export const NEO = {
     "letterSpacingEm": 0.02,
     "nativeSize": 24
 },
+  "phosphor": {
+    "halo": [{"spread": 8, "alpha": 0.06}, {"spread": 4, "alpha": 0.14}],
+    "core": 0.7,
+    "coreAlpha": 0.6
+  },
   "opponents": {
     "activeIntensity": 0.7,
     "targetIntensity": 0.95,

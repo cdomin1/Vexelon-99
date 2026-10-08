@@ -200,7 +200,7 @@ server.on('upgrade',(req,socket,head)=>{
   const origin=req.headers.origin;
   if(origin){try{if(new URL(origin).host!==req.headers.host){socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');return;}}catch{socket.destroy();return;}}
   socket.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: '+createHash('sha1').update(key+'258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64')+'\r\n\r\n');
-  const c={id:randomBytes(6).toString('hex'),resumeToken:randomBytes(24).toString('hex'),socket,room:null,buffer:Buffer.alloc(0),fragments:[],fragmentSize:0,rate:0};clients.add(c);send(c,{type:'hello',id:c.id,resumeToken:c.resumeToken,fluxConfig:balance});
+  const c={id:randomBytes(6).toString('hex'),resumeToken:randomBytes(24).toString('hex'),socket,room:null,buffer:Buffer.alloc(0),fragments:[],fragmentSize:0,rate:0};clients.add(c);send(c,{type:'hello',id:c.id,resumeToken:c.resumeToken,fluxConfig:balance,startProtocol:1});
   const fail=()=>socket.destroy();
   const consume=chunk=>{
     c.buffer=Buffer.concat([c.buffer,chunk]);if(c.buffer.length>16384)return fail();

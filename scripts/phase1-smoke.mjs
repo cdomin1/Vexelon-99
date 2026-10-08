@@ -20,5 +20,5 @@ async function run(command,args){
 }
 try{
   await run('godot',['--headless','--path','godot','--script','res://tests/phase1_smoke.gd','--','--server',url]);
-  await run('./node_modules/.bin/electron',['scripts/phase1-web-smoke.cjs']);
+  if(!process.argv.includes('--native-only'))await run('./node_modules/.bin/electron',['scripts/phase1-web-smoke.cjs']);
 }finally{await game.close();}

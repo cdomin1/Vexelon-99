@@ -55,7 +55,7 @@ test('Surge boosts outgoing and cancelled attacks and Flux; server timers expire
   const {room,players:[a]}=fixture(),b=a.board;b.flux=75;assert.ok(useAbility(a,room,'surge'));
   assert.equal(b.flux,0);assert.equal(b.abilityRemaining,8);
   b.grid[11]=[1,1,1,1,1,1];b.resolve();b.chain=3;b.receive(5);b.tick(.5,0);
-  assert.ok(Math.abs(b.flux-(10+14)*1.2)<1e-8);
+  assert.ok(Math.abs(b.flux-(10+14+FLUX.counter)*1.2)<1e-8);
   assert.equal(b.events.find(e=>e.type==='clear').attack,Math.round(17*1.35)-5);
   b.phase='clear';b.timer=100;b.tick(7.5,0);assert.equal(b.activeAbility,null);assert.equal(b.abilityRemaining,0);
 });

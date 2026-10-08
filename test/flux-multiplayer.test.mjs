@@ -4,8 +4,8 @@ import {createGameServer} from '../server.mjs';
 import {Board} from '../engine.mjs';
 import {FLUX} from '../flux-config.mjs';
 
-async function setup(t,{balance=FLUX}={}){
-  const boardFactory=()=>{const b=new Board(()=>.4,balance);b.grid=b.grid.map(row=>row.map(()=>0));b.grid[11]=[1,2,3,4,1,2];b.flux=100;b.receive(12,100);return b;};
+async function setup(t,{balance=FLUX,boardFactory:customBoardFactory}={}){
+  const boardFactory=()=>{if(customBoardFactory)return customBoardFactory();const b=new Board(()=>.4,balance);b.grid=b.grid.map(row=>row.map(()=>0));b.grid[11]=[1,2,3,4,1,2];b.flux=100;b.receive(12,100);return b;};
   const game=createGameServer({port:0,host:'127.0.0.1',balance,boardFactory}),url=await game.listen(),sockets=[];
   t.after(async()=>{for(const ws of sockets)ws.close();await game.close();});
   async function client(){
@@ -17,7 +17,7 @@ async function setup(t,{balance=FLUX}={}){
   return {game,url,client};
 }
 test('server ignores forged Flux, costs, duration and targets; requests are idempotent across resume',async t=>{
-  const {client}=await setup(t),a=await client();assert.equal(a.hello.fluxConfig.pulse.cost,35);
+  const {client}=await setup(t),a=await client();assert.equal(a.hello.fluxConfig.pulse.cost,35);assert.equal(a.hello.startProtocol,1);
   a.send({type:'session',resumable:true});a.send({type:'create',mode:'duel',bots:1,quick:true});await a.wait('start');await a.wait('state',s=>s.countdown===0);
   const pulse={type:'ability',ability:'pulse',requestId:'pulse-1',flux:999,cost:0,target:'cpu',cancelled:999};
   a.send(pulse);assert.equal((await a.wait('pulse')).cancelled,6);const spent=await a.wait('state',s=>s.self.flux===65);assert.equal(spent.self.incoming[0].amount,6);
@@ -45,4 +45,14 @@ test('expired resume tokens cannot recover abandoned rooms or stale ability stat
   const {client}=await setup(t,{balance}),a=await client();a.send({type:'session',resumable:true});a.send({type:'create',bots:1,quick:true});await a.wait('start');a.ws.close();
   await new Promise(r=>setTimeout(r,350));const b=await client();b.send({type:'resume',token:a.hello.resumeToken});await b.wait('resumeRejected');
   b.send({type:'create',bots:1,quick:true});await b.wait('start');const state=await b.wait('state');assert.equal(state.self.flux,100);assert.equal(state.self.activeAbility,null);
+});
+test('Glitch Counter rewards originate from an authoritative clear, never a forged client event',async t=>{
+  const boardFactory=()=>{const b=new Board(()=>.4);b.grid=b.grid.map(r=>r.map(()=>0));b.grid[11]=[1,1,2,1,3,4];b.grid[9][2]=b.grid[10][2]=1;b.receive(6,100);return b;};
+  const {client}=await setup(t,{boardFactory}),a=await client();
+  assert.equal(a.hello.fluxConfig.counter,8);
+  a.send({type:'create',mode:'duel',bots:1,quick:true});await a.wait('start');await a.wait('state',s=>s.countdown===0);
+  a.send({type:'counter',reward:999,flux:100});a.send({type:'move',dx:0,dy:1});a.send({type:'move',dx:0,dy:1});a.send({type:'swap'});
+  const counter=await a.wait('counter');assert.equal(counter.reward,8);assert.equal(counter.cancelled,4);
+  const state=await a.wait('state',s=>s.self.flux===15);assert.equal(state.self.score,50);
+  assert.equal(state.self.charge,15);assert.equal(state.self.incoming[0].amount,2);
 });

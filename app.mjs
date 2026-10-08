@@ -52,11 +52,14 @@ reducedMotion.addEventListener('change',()=>applyEffectsSettings());
 function show(section){if(section!=='arena')battleTargeting.stop();if(section!=='arena'){music.setContext('title');document.body.classList.remove('small-match','team-match');}document.body.classList.toggle('in-match',section==='arena');for(const s of ['entry','lobby','arena'])$(s).hidden=s!==section;}
 function send(data){if(trainingActive&&training){if(data.type==='leave'){stopTraining();return;}training.handle(data);return;}if(ws?.readyState===1)ws.send(JSON.stringify(data));else error('Connection lost. Reload to reconnect.');}
 function error(message){$('entry-error').textContent=message;$('lobby-error').textContent=message;if(playing)log(message);}
+let incompatibleServer=false;
 function connect(){
+  incompatibleServer=false;
   ws=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/socket`);
-  ws.onopen=()=>{$('connection').textContent='';$('create').disabled=false;$('play-cpu').disabled=false;for(const b of document.querySelectorAll('#join-form button'))b.disabled=false;};
+  ws.onopen=()=>{$('connection').textContent='Checking server…';};
   ws.onclose=()=>{
     if(trainingActive)return;
+    if(incompatibleServer)return;
     music.setContext('title');
     $('connection').textContent='Disconnected';$('create').disabled=true;$('play-cpu').disabled=true;
     error(room?'Connection lost. Reconnecting…':'Disconnected. Reload to connect.');playing=false;
@@ -72,7 +75,12 @@ function receiveMessage(msg){
   if(msg.type==='tutorialSuccess'){presentation.trigger('pulse',performance.now());effects.play('clear');}battleIntro.observe(msg);battleIntro.schedule(msg);
     if(['pulse','ability','attack','effect'].includes(msg.type))presentation.trigger(msg.ability||msg.type,performance.now(),msg);
     animations.event(msg,state?.players.find(p=>p.id===id)?.grid,state?.self.rise||0);
-    if(msg.type==='hello'){const previous=resumeToken;id=msg.id;liveId=id;fluxConfig=msg.fluxConfig||FLUX;resumeToken=msg.resumeToken;send({type:'session',resumable:true,startProtocol:1});if(previous&&room)send({type:'resume',token:previous});}
+    if(msg.type==='hello'){
+      incompatibleServer=msg.startProtocol!==1||!msg.fluxConfig?.overdrive;
+      for(const b of document.querySelectorAll('#create,#play-cpu,#join-form button'))b.disabled=incompatibleServer;
+      if(incompatibleServer){$('connection').textContent='Outdated game server';error('Start the current server.mjs, then reload. This server cannot start Phase 1 matches.');ws.close(1000,'Incompatible start protocol');return;}
+      $('connection').textContent='';const previous=resumeToken;id=msg.id;liveId=id;fluxConfig=msg.fluxConfig;resumeToken=msg.resumeToken;send({type:'session',resumable:true,startProtocol:1});if(previous&&room)send({type:'resume',token:previous});
+    }
     if(msg.type==='resumed'){id=msg.id;resumeToken=msg.resumeToken;room=msg.room;host=msg.host;}
     if(msg.type==='resumeRejected'){room=null;state=null;playing=false;show('entry');error('Session expired. Join a new room.');}
     if(msg.type==='host'){host=msg.host;if(finished)$('rematch').hidden=host!==id;}
@@ -117,6 +125,7 @@ function receiveMessage(msg){
 
       if(previousState?.matchId===msg.matchId&&msg.self.danger>0&&previousState.self.danger<=0)effects.play('danger');if(previousState?.matchId===msg.matchId&&msg.self.danger>=1&&previousState.self.danger<1)effects.play('critical');
       if(previousState?.matchId===msg.matchId&&msg.self.abilities?.overdrive&&!previousState.self.abilities?.overdrive)effects.play('overdriveReady');
+      if(previousState?.matchId===msg.matchId&&previousState.self.activeAbility&&!msg.self.activeAbility){effects.play('flux');log(`${previousState.self.activeAbility.toUpperCase()} complete.`);}
       if(previousState?.matchId===msg.matchId&&msg.self.kos>previousState.self.kos)effects.play('ko');
       if(!trainingActive){records.observe(msg.self.score,msg.self.bestChain||msg.self.chain);updateRecords();}
       const flux=msg.self.flux||0;if(previousState?.matchId===msg.matchId){const before=previousState.self.flux||0;if(flux>=100&&before<100)effects.play('ready');else if([35,60,75].some(value=>before<value&&flux>=value))effects.play('flux');}presentation.meter(flux,fluxConfig.max,performance.now());
@@ -124,8 +133,8 @@ function receiveMessage(msg){
       $('flux-label').textContent=flux>=fluxConfig.max?'FLUX FULL!':`FLUX ${Math.floor(flux)} / ${fluxConfig.max}`;
       $('flux-meter').setAttribute('aria-valuemax',fluxConfig.max);$('flux-meter').setAttribute('aria-valuenow',Math.floor(flux));
       $('flux-fill').style.width=`${flux/fluxConfig.max*100}%`;
-      for(const [ability,key]of Object.entries((document.body.dataset.input==='gamepad'?{pulse:'WEST',shift:'NORTH',surge:'LB',overdrive:'LT'}:{pulse:'X',shift:'C',surge:'V',overdrive:'B'}))){
-        $(ability).textContent=`${ability[0].toUpperCase()+ability.slice(1)} · ${fluxConfig[ability].cost} · ${key}`;
+      for(const ability of ['pulse','shift','surge','overdrive']){
+        $(ability).textContent=`${ability[0].toUpperCase()+ability.slice(1)} · ${fluxConfig[ability].cost}`;
         $(ability).disabled=!msg.self.abilities?.[ability]||msg.countdown>0||finished;
       }
       $('ability-timer').textContent=msg.self.activeAbility?`${msg.self.activeAbility.toUpperCase()} ${msg.self.abilityRemaining.toFixed(1)}s`:flux>=fluxConfig.max?`OVERDRIVE ${Math.max(0,fluxConfig.overdrive.hold-msg.self.maxFluxHeld).toFixed(1)}s`:'';
@@ -143,6 +152,7 @@ function receiveMessage(msg){
     if(msg.type==='move'||msg.type==='swap')effects.play(msg.type);
     if(msg.type==='pulse'){effects.play('pulse');log(msg.assist?`${msg.from} rescued ${msg.to}: ${msg.cancelled} blocks cancelled!`:`Pulse cancelled ${msg.cancelled} incoming blocks.`);}
     if(msg.type==='break'){effects.play('glitchBreak');log('GLITCH BREAK! Tiles are breaking free.');}
+    if(msg.type==='counter'){effects.play('flux');log(`GLITCH COUNTER! ${msg.cancelled} blocked · +${msg.reward} Flux`);}
     if(msg.type==='convert')effects.play('move');
     if(msg.type==='effect'){effects.play('clear',msg);if(msg.chain>1||msg.count>3)log(msg.chain>1?`${msg.chain}× chain! Keep it going.`:`${msg.count}-panel combo!`);}
     if(msg.type==='attack'){battleTargeting.confirm(msg);log(`${msg.from} sent ${msg.amount} Glitch Blocks.`);effects.play('incoming');}

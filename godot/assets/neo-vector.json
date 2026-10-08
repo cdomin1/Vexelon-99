@@ -1784,5 +1784,19 @@
     "eliminatedIntensity": 0.1,
     "activeColor": "#8EB6C8",
     "perimeterColor": "#526F82"
+  },
+  "phosphor": {
+    "halo": [
+      {
+        "spread": 8,
+        "alpha": 0.06
+      },
+      {
+        "spread": 4,
+        "alpha": 0.14
+      }
+    ],
+    "core": 0.7,
+    "coreAlpha": 0.6
   }
 }

@@ -3,6 +3,7 @@ export const FLUX = Object.freeze({
   max:100,
   combo:{3:2,4:4,5:7,6:10},
   chain:{2:8,3:14,4:22,5:30},
+  counter:8,
   activationCooldown:.3,
   chainGrace:.12,
   reconnectSeconds:15,

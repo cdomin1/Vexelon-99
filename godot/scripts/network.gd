@@ -18,8 +18,13 @@ var ping_remaining = 0.0
 var last_server_time = 0.0
 var ability_sequence = 0
 var ability_session = str(Time.get_ticks_usec())
+var compatibility_error = ""
+
+static func supports_phase1(hello: Dictionary) -> bool:
+	return hello.get("startProtocol",0)==1 and hello.get("fluxConfig",{}) is Dictionary and hello.get("fluxConfig",{}).has("overdrive")
 
 func connect_server(address: String, recover: bool = false) -> void:
+	compatibility_error=""
 	server_address=address
 	pending_resume=resume_token if recover else ""
 	if not recover: resume_token=""
@@ -88,6 +93,12 @@ func _process(_delta: float) -> void:
 			var value = JSON.parse_string(socket.get_packet().get_string_from_utf8())
 			if value is Dictionary:
 				if value.get("type") == "hello":
+					if not supports_phase1(value):
+						compatibility_error="Outdated game server at %s. Start the current server.mjs, then reconnect in Settings." % server_address
+						player_id="";resume_token="";pending_resume="";connecting=false;was_open=false
+						socket.close(1000,"Incompatible start protocol")
+						connection_changed.emit(false,compatibility_error)
+						return
 					player_id = str(value.id)
 					resume_token=value.get("resumeToken","")
 					send_message({"type":"session","resumable":true,"startProtocol":1})

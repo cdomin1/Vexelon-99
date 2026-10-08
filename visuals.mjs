@@ -29,6 +29,7 @@ export class BoardAnimations {
     if(grid){const top=grid.findIndex(row=>row.some(Boolean));this.freeTop=top<0?12:top;}
     if(event.type==='ability'){this.badge(event.ability.toUpperCase()+'!',180,330,'#00E5FF',now);this.burst([30,35,36,41],grid,rise,now);}
     if(event.type==='pulse'){this.badge(event.assist?'TEAM RESCUE!':'PULSE!',180,330,'#00E5FF',now);this.burst([0,1,2,3,4,5],grid,0,now);}
+    if(event.type==='counter')this.badge('GLITCH COUNTER!',180,60,'#00E5FF',now);
     if(event.type==='swap')this.swap={...event,start:now};
     if(event.type==='effect'){
       const positions=event.positions||[],x=positions.length?positions.reduce((n,p)=>n+(p%6+.5)*60,0)/positions.length:180;
@@ -79,11 +80,11 @@ export class BoardAnimations {
   }
 }
 
-function panel(context,value,x,y,cell,{mini=false,flash=false,scale=1,warning=false,now=0,reducedMotion=false,compress=false,intensity=1,tone=null}={}){
+function panel(context,value,x,y,cell,{mini=false,flash=false,scale=1,warning=false,now=0,reducedMotion=false,compress=false,intensity=1,tone=null,glow=true}={}){
   if(!TILE_STYLES[value]||scale<=0)return;
   context.save();context.translate(x*cell+cell/2,y*cell+cell/2);
   context.scale(scale,compress?.94:scale);
-  drawVectorTile(context,value,-cell/2,-cell/2,cell,{mini,matching:flash,intensity:mini?intensity:1,tone:mini?tone:null});
+  drawVectorTile(context,value,-cell/2,-cell/2,cell,{mini,matching:flash,intensity:mini?intensity:1,tone:mini?tone:null,glow});
   if(warning){context.strokeStyle=NEO.colors.danger;context.lineWidth=1;context.strokeRect(-cell/2+3,-cell/2+3,cell-6,cell-6);}
   context.restore();
 }
@@ -114,7 +115,7 @@ export function drawBoard(context,grid,width,height,{rise=0,matches=[],cursor=nu
     const move=falling.get(p);let dy=y;
     if(move)dy=move.from+(move.to-move.from)*step(now-fall.start,160,6);
     const order=matches.indexOf(p),flashFrame=Math.floor((now-(animations?.clearStarted??now))/32);
-    panel(context,value,x,dy-rise,cell,{mini,intensity:miniIntensity,tone:miniTone,flash:order>=0&&flashFrame<4&&flashFrame%2===0&&!motionReduced&&(animations?.flashing??true),compress:order>=0&&flashFrame===3&&!motionReduced,warning:y<3,now,reducedMotion:motionReduced});
+    panel(context,value,x,dy-rise,cell,{mini,intensity:miniIntensity,tone:miniTone,glow:presentation?.quality!=='minimal',flash:order>=0&&flashFrame<4&&flashFrame%2===0&&!motionReduced&&(animations?.flashing??true),compress:order>=0&&flashFrame===3&&!motionReduced,warning:y<3,now,reducedMotion:motionReduced});
   }
   if(swap){const t=step(now-swap.start,128,5);panel(context,swap.left,swap.x+t,swap.y-rise,cell,{warning:swap.y<3,now});panel(context,swap.right,swap.x+1-t,swap.y-rise,cell,{warning:swap.y<3,now});}
   for(const block of blocks)slab(context,block,(animations?animations.blockY(block,now):block.y)-rise,cell,mini,now,motionReduced,animations?.breakStarts.get(block.id)??(now-360),animations?.flashing??true);

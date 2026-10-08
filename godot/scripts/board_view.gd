@@ -200,7 +200,15 @@ func paint_vector_tile(view: Control, value: int, rect: Rect2, modulation: Color
 		var path=neo.geometry[tile.geometry][index]
 		var points=PackedVector2Array()
 		for point in path.points: points.append(rect.position+pad+Vector2(point[0],point[1])*(rect.size-pad*2))
-		view.draw_polyline(points,color,2.8 if value==3 else 2.0,true)
+		var line=2.8 if value==3 else 2.0
+		if not miniature and fx.quality!="minimal":
+			for pass_data in neo.phosphor.halo:
+				var halo=color;halo.a*=pass_data.alpha
+				view.draw_polyline(points,halo,line+pass_data.spread,true)
+		view.draw_polyline(points,color,line,true)
+		if not miniature and fx.quality!="minimal":
+			var core=Color(neo.colors.neutral);core.a=color.a*neo.phosphor.coreAlpha
+			view.draw_polyline(points,core,neo.phosphor.core,true)
 
 func cursor_at() -> Dictionary:
 	return cursor

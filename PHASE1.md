@@ -13,6 +13,8 @@
 | 5 tiles | 7 | ×4 | 22 |
 | 6+ tiles | 10 | ×5+ | 30 |
 
+Glitch Counter adds **8 Flux** once when a resolving combo/chain attack cancels at least one incoming cell, regardless of how many queued packets it offsets. Surge/Overdrive generation modifiers apply to the reward, and the final balance clamps to 100. Unopposed attacks and ordinary three-tile clears earn no Counter bonus. Pulse retains its full 35-Flux cost; paid defense and raw queue operations do not create a Counter reward. Both clients receive the authoritative `counter` event and display GLITCH COUNTER feedback.
+
 | Ability | Cost | Rules |
 | --- | ---: | --- |
 | Pulse | 35 | Cancel up to six queued cells, defending self first, otherwise a living teammate in 2v2. Empty queues do not spend Flux. |
@@ -65,6 +67,9 @@ Current presentation follows `docs/NEO_VECTOR_STYLE_GUIDE.md`. One canonical vec
 
 - `npm test`: rules, engine, CPU, four mode capacities/teams, real WebSocket synchronization, forged balances, duplicate ability requests, session recovery/expiry, and existing regression tests.
 - `npm run smoke:phase1`: seeded test-only server, actual native UI buttons and web keyboard input for all four abilities, meter/cost/countdown parity, recovery without timer reset, effects preferences, and screenshots. There is no public debug or resource-grant endpoint.
+- `npm run smoke:phase1-native`: the native portion alone for environments where Electron cannot launch. This does not verify browser controls.
+- `npm run smoke:phase1-counter`: native swap/clear/Counter reward and HUD integration against an isolated server.
+- `godot --headless --path godot --script res://tests/startup_smoke.gd -- --server http://127.0.0.1:3000`: actual native START BATTLE flow, populated 99-seat arena, synthetic controller swap, Pause and return. Requires the current server on the specified port.
 - `npm run smoke:godot`: real Godot protocol clients in 2P, 4P, teams, and a 99-seat CPU room, plus browser/Godot cross-play.
 - `npm run smoke:web`: current browser/menu/audio/viewport regression checks against a running server. Set `PANEL99_WEB_URL` to choose a port.
 - `godot --path godot -- --smoke-ui --server http://127.0.0.1:3000`: native graphical/controller/resize checks.

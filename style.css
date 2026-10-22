@@ -26,6 +26,7 @@ dialog{color:var(--ink);background:#020409;border:1px solid #31516A;padding:24px
 .entry #online-options{margin:18px 0 0;padding:18px 0 0;border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1.3fr;gap:6px 18px;align-items:end}
 .entry #online-options h2{grid-column:1/-1;font-size:13px;font-weight:500;letter-spacing:.04em;color:var(--muted);margin:0}
 .entry #create{text-align:left;padding:8px 0;font-size:14px;font-weight:500}.entry #join-form label{font-size:12px}.entry .join-row button{font-weight:500;padding:8px 4px}
+.entry #find-live,.entry .live-status{grid-column:1/-1}.entry #find-live{text-align:left;padding:8px 0;font-size:14px;font-weight:500;color:#00E5FF}.entry .live-status{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;color:#00E5FF}.entry .live-status button{min-height:32px;padding:2px 0}
 .entry .card-note{font-size:12px;margin:10px 0 0;min-height:18px}
 button,label,select,summary{font-weight:var(--ui-medium)}h1,h2,strong,.board-overlay strong{font-weight:var(--ui-bold)}h1,h2,h3{letter-spacing:var(--ui-tracking)}
 @media(max-width:800px){.entry{gap:32px;grid-template-columns:minmax(220px,1fr) minmax(300px,1fr);margin:24px auto}.entry .title-menu p{font-size:14px;letter-spacing:.02em}}

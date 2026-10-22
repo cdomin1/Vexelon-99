@@ -62,7 +62,7 @@ function connect(){
     if(trainingActive)return;
     if(incompatibleServer)return;
     music.setContext('title');
-    $('connection').textContent='Disconnected';$('create').disabled=true;$('play-cpu').disabled=true;
+    $('connection').textContent='Disconnected';$('create').disabled=true;$('play-cpu').disabled=true;$('find-live').disabled=true;
     error(room?'Connection lost. Reconnecting…':'Disconnected. Reload to connect.');playing=false;
     if(!$('arena').hidden){overlay('Reconnecting','The match continues. Recovering your session…');$('leave-match').hidden=false;}
     if(room){clearTimeout(reconnectTimer);reconnectTimer=setTimeout(connect,750);}
@@ -78,7 +78,7 @@ function receiveMessage(msg){
     animations.event(msg,state?.players.find(p=>p.id===id)?.grid,state?.self.rise||0);
     if(msg.type==='hello'){
       incompatibleServer=msg.startProtocol!==1||!msg.fluxConfig?.overdrive||msg.combatConfig?.version!==COMBAT.version;
-      for(const b of document.querySelectorAll('#create,#play-cpu,#join-form button'))b.disabled=incompatibleServer;
+      for(const b of document.querySelectorAll('#create,#play-cpu,#find-live,#join-form button'))b.disabled=incompatibleServer;
       if(incompatibleServer){$('connection').textContent='Outdated game server';error('Start the current server.mjs, then reload. This server cannot start Phase 2 matches.');ws.close(1000,'Incompatible start protocol');return;}
       $('connection').textContent='';const previous=resumeToken;id=msg.id;liveId=id;fluxConfig=msg.fluxConfig;resumeToken=msg.resumeToken;send({type:'session',resumable:true,startProtocol:1,combatVersion:COMBAT.version});if(previous&&room)send({type:'resume',token:previous});
     }
@@ -87,6 +87,7 @@ function receiveMessage(msg){
     if(msg.type==='host'){host=msg.host;if(finished)$('rematch').hidden=host!==id;}
     if(msg.type==='error'||msg.type==='startCancelled')error(msg.message);
     if(msg.type==='left'){show('entry');playing=false;room=null;state=null;}
+    if(msg.type==='live'){$('live-status').hidden=!msg.players;if(msg.players)$('live-text').textContent=msg.seconds===null?`IN QUEUE · ${msg.players} human${msg.players===1?'':'s'} — waiting for rivals`:`IN QUEUE · ${msg.players} human${msg.players===1?'':'s'} — match starts in ${msg.seconds}s`;}
     if(msg.type==='lobby'){
       room=msg.room;host=msg.host;roomMode=msg.mode||'battle';roomRules=msg.ruleset||'classic';myTeam=msg.players.find(p=>p.id===id)?.team;playing=false;finished=false;show('lobby');$('room-code').textContent=room;
       $('players-list').replaceChildren();
@@ -103,7 +104,7 @@ function receiveMessage(msg){
       $('lobby-error').textContent='';
     }
     if(msg.type==='start'){
-      $('arena').setAttribute('aria-busy','true');
+      $('arena').setAttribute('aria-busy','true');$('live-status').hidden=true;
       battleIntro.begin(msg);
       battleTargeting.begin(msg,id);
       animations.reset();presentation.reset();state=null;roomMode=msg.mode||'battle';roomRules=msg.ruleset||'classic';myTeam=msg.team;
@@ -273,6 +274,8 @@ try{const saved=JSON.parse(storage?.getItem('cascadia99-fx')||'{}');$('reduced-m
 for(const el of [$('screen-shake'),$('flashing-effects'),$('effect-quality'),$('reduced-motion')])el.onchange=applyEffectsSettings;applyEffectsSettings();
 $('play-cpu').onclick=()=>{effects.unlock();clearErrors();send({type:'create',name:$('name').value,bots:Number($('quick-count').value),difficulty:$('quick-difficulty').value,...matchSelection(),quick:true});};
 $('create').onclick=()=>{effects.unlock();clearErrors();send({type:'create',name:$('name').value,...matchSelection()});};
+$('find-live').onclick=()=>{effects.unlock();clearErrors();send({type:'live',name:$('name').value});};
+$('live-cancel').onclick=()=>send({type:'liveLeave'});
 $('join-form').onsubmit=e=>{e.preventDefault();clearErrors();send({type:'join',name:$('name').value,code:$('code').value});};
 function clearErrors(){$('entry-error').textContent='';$('lobby-error').textContent='';}
 $('code').oninput=()=>{$('code').value=$('code').value.toUpperCase().replace(/[^A-Z0-9]/g,'');};

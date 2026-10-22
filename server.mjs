@@ -17,7 +17,7 @@ import {CpuController,DIFFICULTIES} from './bot.mjs';
 import {MODES,TEAMS,RULESETS,modeRules,assignTeam,opponents,startError,matchOutcome} from './match-rules.mjs';
 
 // Small dependency-free WebSocket transport. Gameplay remains server authoritative.
-export function createGameServer({port=3000,host='0.0.0.0',desktop=false,balance=FLUX,boardFactory=()=>new Board(Math.random,balance),training=false}={}){
+export function createGameServer({port=3000,host='0.0.0.0',desktop=false,balance=FLUX,boardFactory=()=>new Board(Math.random,balance),training=false,liveWait=15}={}){
 if(training&&host!=='127.0.0.1')throw Error('Offline training server must bind loopback.');
 const rooms=new Map(),clients=new Set(),sessions=new Map();
 // Epoch-shaped monotonic clock: wall-clock adjustments cannot alter a match countdown.
@@ -71,6 +71,31 @@ function configureBots(room,count,difficulty){
   }
   return null;
 }
+// Live matchmaking: one all-human Battle Royale pool. No CPU backfill, no code.
+const liveQueue=new Map(),live={startAt:null};
+function liveStatus(){return {type:'live',players:liveQueue.size,seconds:live.startAt===null?null:Math.max(0,Math.ceil((live.startAt-now())/1000))};}
+function broadcastLive(){const status=liveStatus();for(const c of liveQueue.keys())send(c,status);}
+function queueLive(c,name){
+  if(c.combatVersion!==COMBAT.version)return send(c,{type:'error',message:'Update your client for Phase 2 before joining.'});
+  if(c.room||c.training)return send(c,{type:'error',message:'Leave your current match or training before finding a live match.'});
+  c.name=String(name||'Player').trim().slice(0,18)||'Player';
+  liveQueue.set(c,true);
+  if(liveQueue.size>=MODES.battle.capacity)return launchLive();
+  if(liveQueue.size>=MODES.battle.required&&live.startAt===null)live.startAt=now()+liveWait*1000;
+  broadcastLive();
+}
+function dequeueLive(c){if(!liveQueue.delete(c))return;send(c,{type:'live',players:0,seconds:null});if(liveQueue.size<MODES.battle.required)live.startAt=null;broadcastLive();}
+function launchLive(){
+  const entrants=[...liveQueue.keys()].slice(0,MODES.battle.capacity);
+  live.startAt=null;
+  if(entrants.length<MODES.battle.required)return broadcastLive();
+  if(rooms.size>=100){for(const c of entrants){liveQueue.delete(c);send(c,{type:'error',message:'Server is full. Try again later.'});send(c,{type:'live',players:0,seconds:null});}return;}
+  let code;do{code=randomBytes(3).toString('hex').toUpperCase();}while(rooms.has(code));
+  const room={code,host:entrants[0].id,players:new Map(),state:'waiting',elapsed:0,mode:'battle',ruleset:'classic',live:true};rooms.set(code,room);
+  for(const c of entrants){liveQueue.delete(c);c.room=room;room.players.set(c.id,c);}
+  broadcastLive();
+  startMatch(entrants[0],room);
+}
 function startMatch(c,room){
   const error=startError(room);if(error)return send(c,{type:'error',message:error});
   room.state='playing';room.elapsed=0;room.countdown=3;
@@ -91,6 +116,7 @@ function cancelStart(room,reason){
   notify(room);
 }
 function leave(c){
+  dequeueLive(c);
   const room=c.room;if(!room)return;
   if(room.state==='playing'&&c.board&&!c.board.dead){c.board.dead=true;c.place=[...room.players.values()].filter(p=>!p.board.dead).length+1;}
   room.players.delete(c.id);c.room=null;
@@ -151,6 +177,8 @@ function onMessage(c,msg){
     if(msg.type==='create'&&msg.bots!==undefined){const error=configureBots(room,msg.bots,msg.difficulty||'normal');if(error)send(c,{type:'error',message:error});}
     notify(room);if(msg.type==='create'&&msg.quick===true&&room.players.size>=2)startMatch(c,room);return;
   }
+  if(msg.type==='live')return queueLive(c,msg.name);
+  if(msg.type==='liveLeave')return dequeueLive(c);
   const room=c.room;if(!room)return;
   if(msg.type==='leave'){leave(c);send(c,{type:'left'});return;}
   if(msg.type==='settings'&&room.host===c.id&&room.state==='waiting'){
@@ -257,6 +285,7 @@ const interval=setInterval(()=>{
   tick++;
   for(const c of clients)if(c.training)c.training.tick(.05);
   for(const [token,c]of sessions)if(c.disconnectedAt&&Date.now()-c.disconnectedAt>balance.reconnectSeconds*1000){leave(c);sessions.delete(token);}
+  if(live.startAt!==null){if(now()>=live.startAt)launchLive();else if(tick%20===0)broadcastLive();}
   for(const room of rooms.values()){
     if(room.state!=='playing')continue;
     const time=now();
@@ -298,7 +327,7 @@ return {
 }
 
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
-  const game=createGameServer({port:process.env.PORT===undefined?3000:Number(process.env.PORT),host:process.env.HOST||'0.0.0.0'});
+  const game=createGameServer({port:process.env.PORT===undefined?3000:Number(process.env.PORT),host:process.env.HOST||'0.0.0.0',liveWait:process.env.LIVE_WAIT===undefined?15:Number(process.env.LIVE_WAIT)});
   game.listen().then(url=>console.log(`VEXELON 99 listening on ${url}`)).catch(error=>{console.error(error);game.close();process.exitCode=1;});
   for(const signal of ['SIGTERM','SIGINT'])process.on(signal,()=>game.close());
 }

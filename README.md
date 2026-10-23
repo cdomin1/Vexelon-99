@@ -11,7 +11,7 @@ cd /home/thinkypad/Projects/panel-99
 npm start
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3001](http://localhost:3001).
 
 - **Play CPU battle:** choose a mode, Classic or Rush rules, and Easy, Normal, or Hard difficulty. VS presets fill the remaining seats with CPUs; Battle Royale allows 1, 3, 9, 24, or 98 CPUs.
 - **Create a room for friends:** select the mode and share the game address and room code. Every person plays on their own device. The host can fill open seats with CPUs and adjust mode/rules in the lobby.

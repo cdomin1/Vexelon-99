@@ -110,11 +110,11 @@ export class BoardAnimations {
   }
 }
 
-function panel(context,value,x,y,cell,{mini=false,flash=false,scale=1,warning=false,now=0,reducedMotion=false,compress=false,intensity=1,tone=null,glow=true}={}){
+function panel(context,value,x,y,cell,{mini=false,flash=false,scale=1,warning=false,now=0,reducedMotion=false,compress=false,intensity=1,tone=null,glow=true,pixelScale=0}={}){
   if(!TILE_STYLES[value]||scale<=0)return;
   context.save();context.translate(x*cell+cell/2,y*cell+cell/2);
   context.scale(scale,compress?.94:scale);
-  drawVectorTile(context,value,-cell/2,-cell/2,cell,{mini,matching:flash,intensity:mini?intensity:1,tone:mini?tone:null,glow,now,reducedMotion});
+  drawVectorTile(context,value,-cell/2,-cell/2,cell,{mini,matching:flash,intensity:mini?intensity:1,tone:mini?tone:null,glow,now,reducedMotion,pixelScale});
   if(warning){context.strokeStyle=NEO.colors.danger;context.lineWidth=1;context.strokeRect(-cell/2+3,-cell/2+3,cell-6,cell-6);}
   context.restore();
 }
@@ -126,6 +126,7 @@ function slab(context,block,y,cell,mini,now,reducedMotion=false,breakStart=now,f
 
 export function drawBoard(context,grid,width,height,{rise=0,matches=[],cursor=null,danger=false,critical=false,mini=false,miniIntensity=NEO.opponents.activeIntensity,miniTone=null,extinguished=false,lessonHint=null,blocks=[],animations=null,presentation=null,activeAbility=null,reducedMotion=false,now=performance.now()}={}){
   const motionReduced=animations?.reducedMotion??reducedMotion;
+  const pixelScale=context.getTransform?.().a||1;
   let boardOffset={x:0,y:0};
   const cell=width/6;context.clearRect(0,0,width,height);context.save();
   if(animations&&!animations.reducedMotion&&animations.shakeUntil>now){const strength=3*(animations.shakeScale??1),frame=Math.floor(now/32);boardOffset={x:snap((frame%2?1:-1)*strength),y:snap((frame%3-1)*strength)};context.translate(boardOffset.x,boardOffset.y);}
@@ -145,7 +146,7 @@ export function drawBoard(context,grid,width,height,{rise=0,matches=[],cursor=nu
     const move=falling.get(p);let dy=y;
     if(move)dy=move.from+(move.to-move.from)*Math.min(1,Math.max(0,(now-fall.start)/160));
     const order=matches.indexOf(p),flashFrame=Math.floor((now-(animations?.clearStarted??now))/32);
-    panel(context,value,x,dy-rise,cell,{mini,intensity:miniIntensity,tone:miniTone,glow:presentation?.quality!=='minimal',flash:order>=0&&flashFrame<4&&flashFrame%2===0&&!motionReduced&&(animations?.flashing??true),compress:order>=0&&flashFrame===3&&!motionReduced,warning:y<3,now,reducedMotion:motionReduced||animations?.flashing===false});
+    panel(context,value,x,dy-rise,cell,{mini,intensity:miniIntensity,tone:miniTone,glow:presentation?.quality!=='minimal',flash:order>=0&&flashFrame<4&&flashFrame%2===0&&!motionReduced&&(animations?.flashing??true),compress:order>=0&&flashFrame===3&&!motionReduced,warning:y<3,now,reducedMotion:motionReduced||animations?.flashing===false,pixelScale});
   }
   if(swap){const t=Math.min(1,Math.max(0,(now-swap.start)/128));panel(context,swap.left,swap.x+t,swap.y-rise,cell,{warning:swap.y<3,now});panel(context,swap.right,swap.x+1-t,swap.y-rise,cell,{warning:swap.y<3,now});}
   for(const block of blocks)slab(context,block,(animations?animations.blockY(block,now):block.y)-rise,cell,mini,now,motionReduced,animations?.breakStarts.get(block.id)??(now-360),animations?.flashing??true);

@@ -312,10 +312,8 @@ const interval=setInterval(()=>{
     }
     const outcome=matchOutcome(room),alive=outcome.alive;
     if(room.countdown===0&&outcome.finished){room.state='finished';room.outcome=outcome;for(const p of room.players.values())send(p,finishMessage(p,room,outcome));}
-    if(tick%2===0||room.state==='finished'){
-      const players=publicPlayers(room);
-      for(const p of room.players.values())if(!p.bot)send(p,stateMessage(p,room,players));
-    }
+    const players=publicPlayers(room);
+    for(const p of room.players.values())if(!p.bot)send(p,stateMessage(p,room,players));
   }
   if(tick%20===0)for(const c of clients){c.rate=0;frame(c.socket,'',9);}
 },50);

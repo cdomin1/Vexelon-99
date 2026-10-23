@@ -1,6 +1,6 @@
 # VEXELON 99
 
-**Neo-Vector Arcade — “1982, BUT IMPOSSIBLE.”** A rising-panel puzzle battle game for web and native Godot. Both clients use the same authoritative Node engine for competitive matches. No Phase 2 mechanics are included.
+**Neo-Vector Arcade — “1982, BUT IMPOSSIBLE.”** A rising-panel puzzle battle game for web and native Godot. Both clients use the same authoritative Node engine for competitive matches. Phase 2 combat rules are implemented and awaiting full playtest acceptance; Phase 3 remains disabled.
 
 ## Run
 
@@ -15,21 +15,21 @@ Open http://localhost:3000. For Godot, open `godot/project.godot` in Godot 4 or 
 
 ## Interface
 
-Direct homepage match setup → Play CPUs or Create Room / Join. Player name, CPU settings and online room creation/joining are immediately accessible. Kode Mono is bundled locally for both web and Godot. Tutorial reveals one system at a time; Free Practice keeps training utilities in Pause → Practice Tools. Press Escape / Start for Pause; online simulation continues.
+Direct homepage match setup → Play CPUs, Find Live Match, or Create Room / Join. Player name, CPU settings, the live queue and online room creation/joining are immediately accessible. Kode Mono is bundled locally for both web and Godot. Tutorial reveals one system at a time; Free Practice keeps training utilities in Pause → Practice Tools. Press Escape / Start for Pause; online simulation continues.
 
 VEXELON has one canonical palette. Themes/light mode are removed; saved legacy theme preferences are ignored/migrated. Audio/music selection, volume and accessibility remain in Settings.
 
 ## Play
 
-Move the two-cell selector. Swap. Match three identical shapes. Keep the stack below the top. Bigger clears and falling chains send **Glitch Attacks**; matching beside **Glitch Blocks** breaks them into tiles. Attacks first cancel incoming blocks under the existing Phase 1 rules.
+Move the two-cell selector. Swap. Match three identical shapes. Keep the stack below the top. Bigger clears and falling chains send **Glitch Attacks**; matching beside **Glitch Blocks** breaks them into tiles. Attacks cancel ordered incoming packets during their four-second counter window. A x2+ chain that fully cancels an urgent packet returns part of it as a **Reversal**; fall-built chains of x3+ announce **Cascade**. Neither adds bonus rewards.
 
-Modes: 2P Duel, 4P free-for-all, 2v2 Teams, and 2–99-seat Battle Royale. Fill seats with CPUs or share a six-character room code with friends. Classic/Rush and Easy/Normal/Hard CPUs remain available. 99 CPU seats are not proof of 99-human Internet scalability.
+Modes: 2P Duel, 4P free-for-all, 2v2 Teams, and 2–99-seat Battle Royale. Fill seats with CPUs, share a six-character room code with friends, or press FIND LIVE MATCH to queue for an all-human royale — once two humans are waiting, a short countdown launches the match on Classic rules (web only for now). Classic/Rush and Easy/Normal/Hard CPUs remain available. 99 CPU seats are not proof of 99-human Internet scalability.
 
 Flux stays at 0–100. Pulse costs 35 and blocks one incoming row-equivalent or rescues a teammate; Shift costs 60 and lowers a stable stack; Surge costs 75 for eight seconds; Overdrive consumes 100 after a three-second full-charge hold, lasting ten seconds. Current balancing is unchanged in `flux-config.mjs`.
 
 ## Learn and practice
 
-First launch offers an optional Tutorial. Seven replayable interactive lessons teach movement/swaps, matches, rising, combos/chains, Glitch Blocks, Flux and battle basics. Back, restart and skip/exit remain available; Next appears after success.
+First launch offers an optional Tutorial. Ten replayable interactive lessons teach movement/swaps, matches, rising, combos/chains, Glitch Blocks, Flux, battle basics and the Phase 2 Counter Window, Reversal and Cascade systems. Back, restart and skip/exit remain available; Next appears after success.
 
 Free Practice defaults to relaxed play: rising off, normal Flux, Glitch Blocks off and game over off. Configure rise speed, training blocks, unlimited Flux and game over; pause, restart, seed combos/chains and simulate incoming attacks. Practice has no competitive records.
 
